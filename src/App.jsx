@@ -277,7 +277,10 @@ export default function App() {
     setModalInv(false);
   };
 
-  const sair = () => supabase.auth.signOut();
+  const sair = async () => {
+  await supabase.auth.signOut();
+  window.location.reload();
+};
 
   if (carregando) return <><style>{css}</style><div className="loading">Carregando...</div></>;
   if (!session) return <Login />;

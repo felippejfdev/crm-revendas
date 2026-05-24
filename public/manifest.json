@@ -1,6 +1,6 @@
 {
   "name": "CRM Controle",
-  "short_name": "CRM",
+  "short_name": "teste",
   "description": "Sua revenda organizada com elegância",
   "start_url": "/",
   "display": "standalone",
@@ -8,14 +8,14 @@
   "theme_color": "#c2185b",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/pws.jpeg",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/jpeg"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/pws.jpeg",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/jpeg"
     }
   ]
 }

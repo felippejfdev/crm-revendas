@@ -290,12 +290,12 @@ export default function App() {
       <style>{css}</style>
       <div className="crm">
         <div className="header">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, position: "relative", zIndex: 999 }}>
             <div>
               <div className="header-title">✦ CRM Controle</div>
               <div className="header-sub">Sua revenda organizada com elegância</div>
             </div>
-            <button className="btn-sair" onClick={sair}>Sair</button>
+          <button className="btn-sair" onClick={sair}>Sair</button>
           </div>
           <select className="mes-select" value={mes} onChange={e => setMes(e.target.value)}>
             {MESES.map(m => <option key={m} value={m}>{nomeMes(m)}</option>)}

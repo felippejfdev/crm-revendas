@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "./supabase";
 
-const MESES = ["2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10","2026-11","2026-12"];
+const MESES = ["2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12"];
 const TABS = [
   { id: "pedidos", label: "Pedidos", icon: "🛍️" },
   { id: "clientes", label: "Clientes", icon: "👥" },
@@ -80,7 +80,7 @@ const css = `
   .status-entregue { background: #e8f5e9; color: #2e7d32; }
   .status-pendente { background: #fff3e0; color: #e65100; }
   .status-quitado { background: #e8f5e9; color: #2e7d32; }
-  .status-deve { background: #fce4ec; color: #c2185b; }
+  .status-Débito { background: #fce4ec; color: #c2185b; }
   .btns-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
   .btn-entregar { background: #fff3e0; color: #e65100; border: 1.5px solid #ffcc80; border-radius: 10px; padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
   .btn-pagar { background: #e8f5e9; color: #2e7d32; border: 1.5px solid #a5d6a7; border-radius: 10px; padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
@@ -184,7 +184,7 @@ export default function App() {
   const [busca, setBusca] = useState("");
   const [modalPedido, setModalPedido] = useState(false);
   const [modalInv, setModalInv] = useState(false);
-  const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", data: hoje(), mes: "2026-05" });
+  const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", data: hoje(), mes: "2026-05", origem: "" });
   const [invForm, setInvForm] = useState({ descricao: "", valor: "", data: hoje(), mes: "2026-05" });
 
   useEffect(() => {
@@ -231,9 +231,9 @@ export default function App() {
   const clienteMap = useMemo(() => {
     const m = {};
     pedidosMes.forEach(p => {
-      if (!m[p.cliente]) m[p.cliente] = { total: 0, deve: 0, pedidos: 0 };
+      if (!m[p.cliente]) m[p.cliente] = { total: 0, Débito: 0, pedidos: 0 };
       m[p.cliente].total += Number(p.valor);
-      m[p.cliente].deve += (Number(p.valor) / p.parcelas) * (p.parcelas - p.parcelas_pagas);
+      m[p.cliente].Débito += (Number(p.valor) / p.parcelas) * (p.parcelas - p.parcelas_pagas);
       m[p.cliente].pedidos++;
     });
     return Object.entries(m).map(([nome, d]) => ({ nome, ...d }));
@@ -249,6 +249,13 @@ export default function App() {
     await supabase.from("pedidos").update({ parcelas_pagas: atual + 1 }).eq("id", id);
     setPedidos(ps => ps.map(p => p.id === id ? { ...p, parcelas_pagas: atual + 1 } : p));
   };
+
+
+  const voltarParcela = async (id, atual) => {
+  if (atual <= 0) return;
+  await supabase.from("pedidos").update({ parcelas_pagas: atual - 1 }).eq("id", id);
+  setPedidos(ps => ps.map(p => p.id === id ? { ...p, parcelas_pagas: atual - 1 } : p));
+};
 
   const salvarPedido = async () => {
     if (!form.cliente || !form.produto || !form.valor) return;
@@ -278,9 +285,9 @@ export default function App() {
   };
 
   const sair = async () => {
-  await supabase.auth.signOut();
-  window.location.reload();
-};
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
 
   if (carregando) return <><style>{css}</style><div className="loading">Carregando...</div></>;
   if (!session) return <Login />;
@@ -290,12 +297,12 @@ export default function App() {
       <style>{css}</style>
       <div className="crm">
         <div className="header">
-         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, position: "relative", zIndex: 999 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, position: "relative", zIndex: 999 }}>
             <div>
               <div className="header-title">✦ CRM Controle</div>
               <div className="header-sub">Sua revenda organizada com elegância</div>
             </div>
-          <button className="btn-sair" onClick={sair}>Sair</button>
+            <button className="btn-sair" onClick={sair}>Sair</button>
           </div>
           <select className="mes-select" value={mes} onChange={e => setMes(e.target.value)}>
             {MESES.map(m => <option key={m} value={m}>{nomeMes(m)}</option>)}
@@ -328,11 +335,11 @@ export default function App() {
               {pedidosMes.length === 0 && <div className="empty"><div className="empty-icon">🛍️</div>Nenhum pedido neste mês</div>}
               {pedidosMes.map(p => {
                 const valParcela = Number(p.valor) / p.parcelas;
-                const deve = valParcela * (p.parcelas - p.parcelas_pagas);
+                const Débito = valParcela * (p.parcelas - p.parcelas_pagas);
                 return (
                   <div key={p.id} className="pedido-card">
                     <div className="pedido-top">
-                      <div><div className="pedido-nome">{p.cliente}</div><div className="pedido-produto">{p.produto}</div></div>
+                      <div className="pedido-produto">{p.produto}{p.origem ? ` · ${p.origem}` : ""}</div>
                       <div><div className="pedido-valor">{fmt(p.valor)}</div><div className="pedido-data">{p.data}</div></div>
                     </div>
                     <div className="parcelas-row">
@@ -343,11 +350,12 @@ export default function App() {
                     </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <span className={`status-badge ${p.entregue ? "status-entregue" : "status-pendente"}`}>{p.entregue ? "✓ Entregue" : "⏳ Pendente"}</span>
-                      <span className={`status-badge ${deve === 0 ? "status-quitado" : "status-deve"}`}>{deve === 0 ? "✓ Quitado" : `Deve ${fmt(deve)}`}</span>
+                      <span className={`status-badge ${Débito === 0 ? "status-quitado" : "status-Débito"}`}>{Débito === 0 ? "✓ Quitado" : `Débito ${fmt(Débito)}`}</span>
                     </div>
                     <div className="btns-row">
                       {!p.entregue && <button className="btn-entregar" onClick={() => marcarEntregue(p.id)}>📦 Entreguei</button>}
                       {p.parcelas_pagas < p.parcelas && <button className="btn-pagar" onClick={() => pagarParcela(p.id, p.parcelas_pagas, p.parcelas)}>💰 Parcela Paga</button>}
+                      {p.parcelas_pagas > 0 && <button className="btn-entregar" onClick={() => voltarParcela(p.id, p.parcelas_pagas)}>↩ Voltar Parcela</button>}
                     </div>
                   </div>
                 );
@@ -364,8 +372,8 @@ export default function App() {
                   <div><div className="cliente-nome">{c.nome}</div><div className="cliente-sub">{c.pedidos} pedido{c.pedidos > 1 ? "s" : ""}</div></div>
                   <div className="cliente-nums">
                     <div className="cliente-total">{fmt(c.total)}</div>
-                    <div className={`status-badge ${c.deve > 0 ? "status-deve" : "status-quitado"}`} style={{ marginTop: 4 }}>
-                      {c.deve > 0 ? `Deve ${fmt(c.deve)}` : "✓ Em dia"}
+                    <div className={`status-badge ${c.Débito > 0 ? "status-Débito" : "status-quitado"}`} style={{ marginTop: 4 }}>
+                      {c.Débito > 0 ? `Débito ${fmt(c.Débito)}` : "✓ Em dia"}
                     </div>
                   </div>
                 </div>
@@ -435,7 +443,7 @@ export default function App() {
           <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModalPedido(false)}>
             <div className="modal">
               <div className="modal-title">Novo Pedido ✦</div>
-              {[["Cliente","cliente","text","Nome da cliente"],["Produto","produto","text","Ex: Perfume Rose"],["Valor Total (R$)","valor","number","0,00"],["Parcelas","parcelas","number","1"],["Data do Pedido","data","date",""]].map(([label,key,type,ph]) => (
+              {[["Cliente", "cliente", "text", "Nome da cliente"], ["Produto", "produto", "text", "Ex: Perfume Rose"], ["Valor Total (R$)", "valor", "number", "0,00"], ["Parcelas", "parcelas", "number", "1"], ["Data do Pedido", "data", "date", ""]].map(([label, key, type, ph]) => (
                 <div className="field" key={key}>
                   <label>{label}</label>
                   <input type={type} placeholder={ph} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
@@ -447,6 +455,20 @@ export default function App() {
                   {MESES.map(m => <option key={m} value={m}>{nomeMes(m)}</option>)}
                 </select>
               </div>
+
+              <div className="field">
+                <label>Como conheceu</label>
+                <select value={form.origem} onChange={e => setForm(f => ({ ...f, origem: e.target.value }))}>
+                  <option value="">Selecione...</option>
+                  <option value="Instagram">Instagram</option>
+                  <option value="WhatsApp">WhatsApp</option>
+                  <option value="Indicação">Indicação</option>
+                  <option value="Evento">Evento</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </div>
+
+
               <div className="modal-btns">
                 <button className="btn-cancelar" onClick={() => setModalPedido(false)}>Cancelar</button>
                 <button className="btn-salvar" onClick={salvarPedido}>Salvar Pedido</button>
@@ -459,7 +481,7 @@ export default function App() {
           <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModalInv(false)}>
             <div className="modal">
               <div className="modal-title">Registrar Gasto 📦</div>
-              {[["Descrição","descricao","text","Ex: Compra de catálogo"],["Valor (R$)","valor","number","0,00"],["Data","data","date",""]].map(([label,key,type,ph]) => (
+              {[["Descrição", "descricao", "text", "Ex: Compra de catálogo"], ["Valor (R$)", "valor", "number", "0,00"], ["Data", "data", "date", ""]].map(([label, key, type, ph]) => (
                 <div className="field" key={key}>
                   <label>{label}</label>
                   <input type={type} placeholder={ph} value={invForm[key]} onChange={e => setInvForm(f => ({ ...f, [key]: e.target.value }))} />

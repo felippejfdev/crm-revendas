@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "./supabase";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 const MESES = ["2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12"];
 const TABS = [
@@ -7,6 +8,7 @@ const TABS = [
   { id: "clientes", label: "Clientes", icon: "👥" },
   { id: "financeiro", label: "Financeiro", icon: "💰" },
   { id: "investimentos", label: "Invest.", icon: "📦" },
+  { id: "relatorios", label: "Relatórios", icon: "📊" },
 ];
 
 const fmt = (v) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -228,6 +230,33 @@ export default function App() {
   const totalInv = invMes.reduce((s, i) => s + Number(i.valor), 0);
   const lucro = totalRecebido - totalInv;
 
+
+const dadosGrafico = useMemo(() => {
+    return MESES.map(m => {
+      const pedidosM = pedidos.filter(p => p.mes === m);
+      const invM = investimentos.filter(i => i.mes === m);
+      const vendido = pedidosM.reduce((s, p) => s + Number(p.valor), 0);
+      const recebido = pedidosM.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
+      const investido = invM.reduce((s, i) => s + Number(i.valor), 0);
+      const lucroM = recebido - investido;
+      return {
+        mes: m.slice(5),
+        vendido: Number(vendido.toFixed(2)),
+        recebido: Number(recebido.toFixed(2)),
+        investido: Number(investido.toFixed(2)),
+        lucro: Number(lucroM.toFixed(2)),
+      };
+    }).filter(d => d.vendido > 0 || d.recebido > 0 || d.investido > 0);
+  }, [pedidos, investimentos]);
+
+  const melhorMes = useMemo(() => {
+    if (dadosGrafico.length === 0) return null;
+    return dadosGrafico.reduce((a, b) => a.vendido > b.vendido ? a : b);
+  }, [dadosGrafico]);
+
+
+
+
   const clienteMap = useMemo(() => {
     const m = {};
     pedidosMes.forEach(p => {
@@ -415,6 +444,54 @@ export default function App() {
               </div>
             </>
           )}
+
+{tab === "relatorios" && (
+            <>
+              <div className="fin-section" style={{ marginBottom: 14 }}>
+                <div className="fin-title">Evolução de Vendas</div>
+                {melhorMes && (
+                  <div style={{ background: "#fce4ec", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#880e4f" }}>
+                    🏆 Melhor mês: <strong>{melhorMes.mes}</strong> com <strong>{fmt(melhorMes.vendido)}</strong> em vendas
+                  </div>
+                )}
+                {dadosGrafico.length === 0 ? (
+                  <div className="empty"><div className="empty-icon">📊</div>Nenhum dado ainda</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <LineChart data={dadosGrafico} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#fce4ec" />
+                      <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#b0819a" }} />
+                      <YAxis tick={{ fontSize: 10, fill: "#b0819a" }} tickFormatter={v => `R$${v}`} width={55} />
+                      <Tooltip formatter={(v) => fmt(v)} labelFormatter={l => `Mês: ${l}`} contentStyle={{ borderRadius: 10, border: "1px solid #fce4ec", fontSize: 12 }} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Line type="monotone" dataKey="vendido" name="Vendido" stroke="#c2185b" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="recebido" name="Recebido" stroke="#2e7d32" strokeWidth={2} dot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="investido" name="Investido" stroke="#1565c0" strokeWidth={2} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              <div className="fin-section">
+                <div className="fin-title">Lucro por Mês</div>
+                {dadosGrafico.length === 0 ? (
+                  <div className="empty"><div className="empty-icon">💰</div>Nenhum dado ainda</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={dadosGrafico} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#fce4ec" />
+                      <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#b0819a" }} />
+                      <YAxis tick={{ fontSize: 10, fill: "#b0819a" }} tickFormatter={v => `R$${v}`} width={55} />
+                      <Tooltip formatter={(v) => fmt(v)} labelFormatter={l => `Mês: ${l}`} contentStyle={{ borderRadius: 10, border: "1px solid #fce4ec", fontSize: 12 }} />
+                      <Bar dataKey="lucro" name="Lucro" fill="#c2185b" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </>
+          )}
+
+
 
           {tab === "investimentos" && (
             <>

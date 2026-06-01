@@ -286,6 +286,15 @@ const dadosGrafico = useMemo(() => {
   setPedidos(ps => ps.map(p => p.id === id ? { ...p, parcelas_pagas: atual - 1 } : p));
 };
 
+
+const excluirPedido = async (id) => {
+  if (!window.confirm("Tem certeza que quer excluir este pedido?")) return;
+  await supabase.from("pedidos").delete().eq("id", id);
+  setPedidos(ps => ps.filter(p => p.id !== id));
+};
+
+
+
   const salvarPedido = async () => {
     if (!form.cliente || !form.produto || !form.valor) return;
     const { data } = await supabase.from("pedidos").insert([{
@@ -385,6 +394,7 @@ const dadosGrafico = useMemo(() => {
                       {!p.entregue && <button className="btn-entregar" onClick={() => marcarEntregue(p.id)}>📦 Entreguei</button>}
                       {p.parcelas_pagas < p.parcelas && <button className="btn-pagar" onClick={() => pagarParcela(p.id, p.parcelas_pagas, p.parcelas)}>💰 Parcela Paga</button>}
                       {p.parcelas_pagas > 0 && <button className="btn-entregar" onClick={() => voltarParcela(p.id, p.parcelas_pagas)}>↩ Voltar Parcela</button>}
+                      <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={() => excluirPedido(p.id)}>🗑 Excluir</button>
                     </div>
                   </div>
                 );

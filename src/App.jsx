@@ -1,8 +1,17 @@
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "./supabase";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
-const MESES = ["2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12"];
+
+const MESES = (() => {
+  const meses = [];
+  for (let i = -3; i <= 12; i++) {
+    const d = new Date();
+    d.setMonth(d.getMonth() + i);
+    meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return meses;
+})();
 const TABS = [
   { id: "pedidos", label: "Pedidos", icon: "🛍️" },
   { id: "clientes", label: "Clientes", icon: "👥" },
@@ -182,8 +191,14 @@ export default function App() {
   const [tab, setTab] = useState("pedidos");
   const [pedidos, setPedidos] = useState([]);
   const [investimentos, setInvestimentos] = useState([]);
-  const [mes, setMes] = useState("2026-05");
+  const [mes, setMes] = useState(() => {
+    const agora = new Date();
+    return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [busca, setBusca] = useState("");
+  const [margens, setMargens] = useState({});
+  const [editandoMargem, setEditandoMargem] = useState(false);
+  const [margemTemp, setMargemTemp] = useState(50);
   const [modalPedido, setModalPedido] = useState(false);
   const [modalInv, setModalInv] = useState(false);
   const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", data: hoje(), mes: "2026-05", origem: "" });
@@ -203,6 +218,7 @@ export default function App() {
     if (session) {
       carregarPedidos();
       carregarInvestimentos();
+      carregarMargens();
     }
   }, [session]);
 
@@ -214,6 +230,25 @@ export default function App() {
   const carregarInvestimentos = async () => {
     const { data } = await supabase.from("investimentos").select("*").order("created_at", { ascending: false });
     if (data) setInvestimentos(data);
+  };
+
+  const carregarMargens = async () => {
+    const { data } = await supabase.from("margens").select("*");
+    if (data) {
+      const m = {};
+      data.forEach(d => m[d.mes] = d.margem);
+      setMargens(m);
+    }
+  };
+
+  const salvarMargem = async (valor) => {
+    await supabase.from("margens").upsert({
+      user_id: session.user.id,
+      mes,
+      margem: Number(valor)
+    }, { onConflict: "user_id,mes" });
+    setMargens(m => ({ ...m, [mes]: Number(valor) }));
+    setEditandoMargem(false);
   };
 
   const pedidosMes = useMemo(() =>
@@ -231,7 +266,7 @@ export default function App() {
   const lucro = totalRecebido - totalInv;
 
 
-const dadosGrafico = useMemo(() => {
+  const dadosGrafico = useMemo(() => {
     return MESES.map(m => {
       const pedidosM = pedidos.filter(p => p.mes === m);
       const invM = investimentos.filter(i => i.mes === m);
@@ -239,13 +274,15 @@ const dadosGrafico = useMemo(() => {
       const recebido = pedidosM.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
       const investido = invM.reduce((s, i) => s + Number(i.valor), 0);
       const lucroM = recebido - investido;
-      return {
-        mes: m.slice(5),
-        vendido: Number(vendido.toFixed(2)),
-        recebido: Number(recebido.toFixed(2)),
-        investido: Number(investido.toFixed(2)),
-        lucro: Number(lucroM.toFixed(2)),
-      };
+     const margemM = margens[m] || 0;
+return {
+  mes: m.slice(5),
+  vendido: Number(vendido.toFixed(2)),
+  recebido: Number(recebido.toFixed(2)),
+  investido: Number(investido.toFixed(2)),
+  lucro: Number(lucroM.toFixed(2)),
+  meta: Number((investido * (margemM / 100)).toFixed(2)),
+};
     }).filter(d => d.vendido > 0 || d.recebido > 0 || d.investido > 0);
   }, [pedidos, investimentos]);
 
@@ -281,17 +318,31 @@ const dadosGrafico = useMemo(() => {
 
 
   const voltarParcela = async (id, atual) => {
-  if (atual <= 0) return;
-  await supabase.from("pedidos").update({ parcelas_pagas: atual - 1 }).eq("id", id);
-  setPedidos(ps => ps.map(p => p.id === id ? { ...p, parcelas_pagas: atual - 1 } : p));
-};
+    if (atual <= 0) return;
+    await supabase.from("pedidos").update({ parcelas_pagas: atual - 1 }).eq("id", id);
+    setPedidos(ps => ps.map(p => p.id === id ? { ...p, parcelas_pagas: atual - 1 } : p));
+  };
 
 
-const excluirPedido = async (id) => {
-  if (!window.confirm("Tem certeza que quer excluir este pedido?")) return;
-  await supabase.from("pedidos").delete().eq("id", id);
-  setPedidos(ps => ps.filter(p => p.id !== id));
-};
+  const excluirPedido = async (id) => {
+    if (!window.confirm("Tem certeza que quer excluir este pedido?")) return;
+    await supabase.from("pedidos").delete().eq("id", id);
+    setPedidos(ps => ps.filter(p => p.id !== id));
+  };
+
+
+
+  const excluirCliente = async (nome) => {
+    if (!window.confirm(`Excluir todos os pedidos de ${nome}?`)) return;
+    await supabase.from("pedidos").delete().eq("user_id", session.user.id).eq("cliente", nome);
+    setPedidos(ps => ps.filter(p => p.cliente !== nome));
+  };
+
+  const excluirInv = async (id) => {
+    if (!window.confirm("Excluir este gasto?")) return;
+    await supabase.from("investimentos").delete().eq("id", id);
+    setInvestimentos(is => is.filter(i => i.id !== id));
+  };
 
 
 
@@ -414,6 +465,7 @@ const excluirPedido = async (id) => {
                     <div className={`status-badge ${c.Débito > 0 ? "status-Débito" : "status-quitado"}`} style={{ marginTop: 4 }}>
                       {c.Débito > 0 ? `Débito ${fmt(c.Débito)}` : "✓ Em dia"}
                     </div>
+                    <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif", marginTop: 6 }} onClick={() => excluirCliente(c.nome)}>🗑 Excluir</button>
                   </div>
                 </div>
               ))}
@@ -437,6 +489,44 @@ const excluirPedido = async (id) => {
                   </div>
                 ))}
               </div>
+
+
+<div className="fin-section">
+  <div className="fin-title">Margem de Lucro — {nomeMes(mes)}</div>
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+    <span style={{ fontSize: 13, color: "#6d4c61" }}>
+      Margem definida: <strong>{margens[mes] || 0}%</strong>
+    </span>
+    <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setMargemTemp(margens[mes] || 50); setEditandoMargem(true); }}>
+      ✏️ Editar
+    </button>
+  </div>
+  {editandoMargem && (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
+      <input
+        type="number"
+        value={margemTemp}
+        onChange={e => setMargemTemp(e.target.value)}
+        style={{ width: 80, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #fce4ec", fontFamily: "DM Sans, sans-serif", fontSize: 14, textAlign: "center" }}
+      />
+      <span style={{ fontSize: 13, color: "#6d4c61" }}>%</span>
+      <button className="btn-novo" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => salvarMargem(margemTemp)}>Salvar</button>
+      <button className="btn-cancelar" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setEditandoMargem(false)}>Cancelar</button>
+    </div>
+  )}
+  {[
+    { label: "Lucro esperado com a margem", val: fmt(totalInv * ((margens[mes] || 0) / 100)), cor: "#c2185b" },
+    { label: "Lucro real obtido", val: fmt(lucro), cor: lucro >= 0 ? "#2e7d32" : "#c62828" },
+    { label: "Diferença", val: fmt(lucro - totalInv * ((margens[mes] || 0) / 100)), cor: (lucro - totalInv * ((margens[mes] || 0) / 100)) >= 0 ? "#2e7d32" : "#c62828" },
+  ].map(r => (
+    <div key={r.label} className="fin-row">
+      <span className="fin-label">{r.label}</span>
+      <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
+    </div>
+  ))}
+</div>
+
+
               <div className="fin-section">
                 <div className="fin-title">Parcelas em aberto</div>
                 {pedidosMes.filter(p => p.parcelas_pagas < p.parcelas).length === 0
@@ -455,7 +545,7 @@ const excluirPedido = async (id) => {
             </>
           )}
 
-{tab === "relatorios" && (
+          {tab === "relatorios" && (
             <>
               <div className="fin-section" style={{ marginBottom: 14 }}>
                 <div className="fin-title">Evolução de Vendas</div>
@@ -513,7 +603,10 @@ const excluirPedido = async (id) => {
               {invMes.map(i => (
                 <div key={i.id} className="inv-card">
                   <div><div className="inv-desc">{i.descricao}</div><div className="inv-data">{i.data}</div></div>
-                  <div className="inv-val">{fmt(i.valor)}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div className="inv-val">{fmt(i.valor)}</div>
+                    <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={() => excluirInv(i.id)}>🗑</button>
+                  </div>
                 </div>
               ))}
               {invMes.length > 0 && (

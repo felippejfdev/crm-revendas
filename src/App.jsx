@@ -241,16 +241,19 @@ export default function App() {
     }
   };
 
-  const salvarMargem = async (valor) => {
-    await supabase.from("margens").upsert({
-      user_id: session.user.id,
-      mes,
-      margem: Number(valor)
-    }, { onConflict: "user_id,mes" });
+const salvarMargem = async (valor) => {
+  const { data, error } = await supabase.from("margens").upsert({
+    user_id: session.user.id,
+    mes,
+    margem: Number(valor)
+  }, { onConflict: "user_id,mes" });
+  if (error) {
+    alert("Erro ao salvar: " + error.message);
+  } else {
     setMargens(m => ({ ...m, [mes]: Number(valor) }));
     setEditandoMargem(false);
-  };
-
+  }
+};
   const pedidosMes = useMemo(() =>
     pedidos.filter(p => p.mes === mes && (
       p.cliente.toLowerCase().includes(busca.toLowerCase()) ||
@@ -274,17 +277,17 @@ export default function App() {
       const recebido = pedidosM.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
       const investido = invM.reduce((s, i) => s + Number(i.valor), 0);
       const lucroM = recebido - investido;
-     const margemM = margens[m] || 0;
-return {
-  mes: m.slice(5),
-  vendido: Number(vendido.toFixed(2)),
-  recebido: Number(recebido.toFixed(2)),
-  investido: Number(investido.toFixed(2)),
-  lucro: Number(lucroM.toFixed(2)),
-  meta: Number((investido * (margemM / 100)).toFixed(2)),
-};
+      const margemM = margens[m] || 0;
+      return {
+        mes: m.slice(5),
+        vendido: Number(vendido.toFixed(2)),
+        recebido: Number(recebido.toFixed(2)),
+        investido: Number(investido.toFixed(2)),
+        lucro: Number(lucroM.toFixed(2)),
+        meta: Number((lucroM * (margemM / 100)).toFixed(2)),
+      };
     }).filter(d => d.vendido > 0 || d.recebido > 0 || d.investido > 0);
-  }, [pedidos, investimentos]);
+  }, [pedidos, investimentos, margens]);
 
   const melhorMes = useMemo(() => {
     if (dadosGrafico.length === 0) return null;
@@ -329,6 +332,12 @@ return {
     await supabase.from("pedidos").delete().eq("id", id);
     setPedidos(ps => ps.filter(p => p.id !== id));
   };
+
+  const excluirMargem = async () => {
+  if (!window.confirm("Excluir a margem deste mês?")) return;
+  await supabase.from("margens").delete().eq("user_id", session.user.id).eq("mes", mes);
+  setMargens(m => { const n = {...m}; delete n[mes]; return n; });
+};
 
 
 
@@ -491,40 +500,44 @@ return {
               </div>
 
 
-<div className="fin-section">
-  <div className="fin-title">Margem de Lucro — {nomeMes(mes)}</div>
-  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-    <span style={{ fontSize: 13, color: "#6d4c61" }}>
-      Margem definida: <strong>{margens[mes] || 0}%</strong>
-    </span>
-    <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setMargemTemp(margens[mes] || 50); setEditandoMargem(true); }}>
-      ✏️ Editar
-    </button>
-  </div>
-  {editandoMargem && (
-    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
-      <input
-        type="number"
-        value={margemTemp}
-        onChange={e => setMargemTemp(e.target.value)}
-        style={{ width: 80, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #fce4ec", fontFamily: "DM Sans, sans-serif", fontSize: 14, textAlign: "center" }}
-      />
-      <span style={{ fontSize: 13, color: "#6d4c61" }}>%</span>
-      <button className="btn-novo" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => salvarMargem(margemTemp)}>Salvar</button>
-      <button className="btn-cancelar" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setEditandoMargem(false)}>Cancelar</button>
-    </div>
-  )}
-  {[
-    { label: "Lucro esperado com a margem", val: fmt(totalInv * ((margens[mes] || 0) / 100)), cor: "#c2185b" },
-    { label: "Lucro real obtido", val: fmt(lucro), cor: lucro >= 0 ? "#2e7d32" : "#c62828" },
-    { label: "Diferença", val: fmt(lucro - totalInv * ((margens[mes] || 0) / 100)), cor: (lucro - totalInv * ((margens[mes] || 0) / 100)) >= 0 ? "#2e7d32" : "#c62828" },
-  ].map(r => (
-    <div key={r.label} className="fin-row">
-      <span className="fin-label">{r.label}</span>
-      <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
-    </div>
-  ))}
-</div>
+              <div className="fin-section">
+                <div className="fin-title">Margem de Lucro — {nomeMes(mes)}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <span style={{ fontSize: 13, color: "#6d4c61" }}>
+                    Margem definida: <strong>{margens[mes] || 0}%</strong>
+                  </span>
+                  <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setMargemTemp(margens[mes] || 50); setEditandoMargem(true); }}>
+                    ✏️ Editar  {margens[mes] && (
+  <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={excluirMargem}>🗑 Excluir</button>
+)}
+                  </button>
+                </div>
+                {editandoMargem && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
+                    <input
+                      type="number"
+                      value={margemTemp}
+                      onChange={e => setMargemTemp(e.target.value)}
+                      style={{ width: 80, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #fce4ec", fontFamily: "DM Sans, sans-serif", fontSize: 14, textAlign: "center" }}
+                    />
+                    <span style={{ fontSize: 13, color: "#6d4c61" }}>%</span>
+                    <button className="btn-novo" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => salvarMargem(margemTemp)}>Salvar</button>
+                    <button className="btn-cancelar" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setEditandoMargem(false)}>Cancelar</button>
+                  </div>
+                )}
+                {[
+
+                  { label: "Ganho pessoal esperado", val: fmt(lucro * ((margens[mes] || 0) / 100)), cor: "#c2185b" },
+                  { label: "Lucro real obtido", val: fmt(lucro), cor: lucro >= 0 ? "#2e7d32" : "#c62828" },
+                  { label: "Restante no caixa", val: fmt(lucro - lucro * ((margens[mes] || 0) / 100)), cor: "#1565c0" },
+
+                ].map(r => (
+                  <div key={r.label} className="fin-row">
+                    <span className="fin-label">{r.label}</span>
+                    <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
+                  </div>
+                ))}
+              </div>
 
 
               <div className="fin-section">
@@ -583,7 +596,8 @@ return {
                       <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#b0819a" }} />
                       <YAxis tick={{ fontSize: 10, fill: "#b0819a" }} tickFormatter={v => `R$${v}`} width={55} />
                       <Tooltip formatter={(v) => fmt(v)} labelFormatter={l => `Mês: ${l}`} contentStyle={{ borderRadius: 10, border: "1px solid #fce4ec", fontSize: 12 }} />
-                      <Bar dataKey="lucro" name="Lucro" fill="#c2185b" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="meta" name="Ganho Pessoal" fill="#c2185b" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="lucro" name="Lucro Total" fill="#f48fb1" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}

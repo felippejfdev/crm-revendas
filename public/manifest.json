@@ -4,16 +4,16 @@
   "description": "Sua revenda organizada com elegância",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fdf0f5",
+  "background_color": "#c2185b",
   "theme_color": "#c2185b",
   "icons": [
     {
-      "src": "/pwss.png",
+      "src": "/icon.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/pwss.png",
+      "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png"
     }

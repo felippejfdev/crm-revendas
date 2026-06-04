@@ -202,7 +202,7 @@ export default function App() {
   const [modalPedido, setModalPedido] = useState(false);
   const [modalInv, setModalInv] = useState(false);
   const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", data: hoje(), mes: "2026-05", origem: "" });
-  const [invForm, setInvForm] = useState({ descricao: "", valor: "", data: hoje(), mes: "2026-05" });
+  const [invForm, setInvForm] = useState({ descricao: "", valor_catalogo: "", desconto: "", data: hoje(), mes: "" });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -241,19 +241,19 @@ export default function App() {
     }
   };
 
-const salvarMargem = async (valor) => {
-  const { data, error } = await supabase.from("margens").upsert({
-    user_id: session.user.id,
-    mes,
-    margem: Number(valor)
-  }, { onConflict: "user_id,mes" });
-  if (error) {
-    alert("Erro ao salvar: " + error.message);
-  } else {
-    setMargens(m => ({ ...m, [mes]: Number(valor) }));
-    setEditandoMargem(false);
-  }
-};
+  const salvarMargem = async (valor) => {
+    const { data, error } = await supabase.from("margens").upsert({
+      user_id: session.user.id,
+      mes,
+      margem: Number(valor)
+    }, { onConflict: "user_id,mes" });
+    if (error) {
+      alert("Erro ao salvar: " + error.message);
+    } else {
+      setMargens(m => ({ ...m, [mes]: Number(valor) }));
+      setEditandoMargem(false);
+    }
+  };
   const pedidosMes = useMemo(() =>
     pedidos.filter(p => p.mes === mes && (
       p.cliente.toLowerCase().includes(busca.toLowerCase()) ||
@@ -334,10 +334,10 @@ const salvarMargem = async (valor) => {
   };
 
   const excluirMargem = async () => {
-  if (!window.confirm("Excluir a margem deste mês?")) return;
-  await supabase.from("margens").delete().eq("user_id", session.user.id).eq("mes", mes);
-  setMargens(m => { const n = {...m}; delete n[mes]; return n; });
-};
+    if (!window.confirm("Excluir a margem deste mês?")) return;
+    await supabase.from("margens").delete().eq("user_id", session.user.id).eq("mes", mes);
+    setMargens(m => { const n = { ...m }; delete n[mes]; return n; });
+  };
 
 
 
@@ -508,8 +508,8 @@ const salvarMargem = async (valor) => {
                   </span>
                   <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setMargemTemp(margens[mes] || 50); setEditandoMargem(true); }}>
                     ✏️ Editar  {margens[mes] && (
-  <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={excluirMargem}>🗑 Excluir</button>
-)}
+                      <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={excluirMargem}>🗑 Excluir</button>
+                    )}
                   </button>
                 </div>
                 {editandoMargem && (

@@ -265,7 +265,9 @@ export default function App() {
   const totalVendido = pedidosMes.reduce((s, p) => s + Number(p.valor), 0);
   const totalRecebido = pedidosMes.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
   const aReceber = totalVendido - totalRecebido;
-  const totalInv = invMes.reduce((s, i) => s + Number(i.valor), 0);
+  const totalInv = invMes.reduce((s, i) => s + Number(i.valor_pago || i.valor), 0);
+  const totalCatalogo = invMes.reduce((s, i) => s + Number(i.valor_catalogo || i.valor), 0);
+  const lucroInv = invMes.reduce((s, i) => s + Number(i.lucro_bruto || 0), 0);
   const lucro = totalRecebido - totalInv;
 
 
@@ -371,14 +373,22 @@ export default function App() {
   };
 
   const salvarInv = async () => {
-    if (!invForm.descricao || !invForm.valor) return;
+    if (!invForm.descricao || !invForm.valor_catalogo || !invForm.desconto) return;
+    const valor_catalogo = Number(invForm.valor_catalogo);
+    const desconto = Number(invForm.desconto);
+    const valor_pago = valor_catalogo * (1 - desconto / 100);
+    const lucro_bruto = valor_catalogo * (desconto / 100);
     const { data } = await supabase.from("investimentos").insert([{
       ...invForm,
-      valor: Number(invForm.valor),
+      valor: valor_pago,
+      valor_catalogo,
+      desconto,
+      valor_pago,
+      lucro_bruto,
       user_id: session.user.id
     }]).select();
     if (data) setInvestimentos(is => [data[0], ...is]);
-    setInvForm({ descricao: "", valor: "", data: hoje(), mes });
+    setInvForm({ descricao: "", valor_catalogo: "", desconto: "", data: hoje(), mes });
     setModalInv(false);
   };
 
@@ -486,11 +496,13 @@ export default function App() {
               <div className="fin-section">
                 <div className="fin-title">Resumo de {nomeMes(mes)}</div>
                 {[
-                  { label: "Total de vendas", val: fmt(totalVendido), cor: "#c2185b" },
+                  { label: "Total do catálogo", val: fmt(totalCatalogo), cor: "#c2185b" },
+                  { label: "Total pago (investido)", val: fmt(totalInv), cor: "#1565c0" },
+                  { label: "Lucro bruto dos produtos", val: fmt(lucroInv), cor: "#2e7d32" },
+                  { label: "Total vendido", val: fmt(totalVendido), cor: "#c2185b" },
                   { label: "Já recebido", val: fmt(totalRecebido), cor: "#2e7d32" },
                   { label: "Ainda a receber", val: fmt(aReceber), cor: "#c62828" },
-                  { label: "Investido em produtos", val: fmt(totalInv), cor: "#1565c0" },
-                  { label: "Lucro líquido", val: fmt(lucro), cor: lucro >= 0 ? "#2e7d32" : "#c62828" },
+                  { label: "Saldo final", val: fmt(totalRecebido - totalInv), cor: (totalRecebido - totalInv) >= 0 ? "#2e7d32" : "#c62828" },
                 ].map(r => (
                   <div key={r.label} className="fin-row">
                     <span className="fin-label">{r.label}</span>
@@ -500,44 +512,7 @@ export default function App() {
               </div>
 
 
-              <div className="fin-section">
-                <div className="fin-title">Margem de Lucro — {nomeMes(mes)}</div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <span style={{ fontSize: 13, color: "#6d4c61" }}>
-                    Margem definida: <strong>{margens[mes] || 0}%</strong>
-                  </span>
-                  <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setMargemTemp(margens[mes] || 50); setEditandoMargem(true); }}>
-                    ✏️ Editar  {margens[mes] && (
-                      <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={excluirMargem}>🗑 Excluir</button>
-                    )}
-                  </button>
-                </div>
-                {editandoMargem && (
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
-                    <input
-                      type="number"
-                      value={margemTemp}
-                      onChange={e => setMargemTemp(e.target.value)}
-                      style={{ width: 80, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #fce4ec", fontFamily: "DM Sans, sans-serif", fontSize: 14, textAlign: "center" }}
-                    />
-                    <span style={{ fontSize: 13, color: "#6d4c61" }}>%</span>
-                    <button className="btn-novo" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => salvarMargem(margemTemp)}>Salvar</button>
-                    <button className="btn-cancelar" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setEditandoMargem(false)}>Cancelar</button>
-                  </div>
-                )}
-                {[
 
-                  { label: "Ganho pessoal esperado", val: fmt(lucro * ((margens[mes] || 0) / 100)), cor: "#c2185b" },
-                  { label: "Lucro real obtido", val: fmt(lucro), cor: lucro >= 0 ? "#2e7d32" : "#c62828" },
-                  { label: "Restante no caixa", val: fmt(lucro - lucro * ((margens[mes] || 0) / 100)), cor: "#1565c0" },
-
-                ].map(r => (
-                  <div key={r.label} className="fin-row">
-                    <span className="fin-label">{r.label}</span>
-                    <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
-                  </div>
-                ))}
-              </div>
 
 
               <div className="fin-section">
@@ -675,7 +650,7 @@ export default function App() {
           <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModalInv(false)}>
             <div className="modal">
               <div className="modal-title">Registrar Gasto 📦</div>
-              {[["Descrição", "descricao", "text", "Ex: Compra de catálogo"], ["Valor (R$)", "valor", "number", "0,00"], ["Data", "data", "date", ""]].map(([label, key, type, ph]) => (
+              {[["Descrição", "descricao", "text", "Ex: Compra de catálogo"], ["Valor do Catálogo (R$)", "valor_catalogo", "number", "0,00"], ["Desconto (%)", "desconto", "number", "0"], ["Data", "data", "date", ""]].map(([label, key, type, ph]) => (
                 <div className="field" key={key}>
                   <label>{label}</label>
                   <input type={type} placeholder={ph} value={invForm[key]} onChange={e => setInvForm(f => ({ ...f, [key]: e.target.value }))} />
@@ -687,6 +662,13 @@ export default function App() {
                   {MESES.map(m => <option key={m} value={m}>{nomeMes(m)}</option>)}
                 </select>
               </div>
+
+              {invForm.valor_catalogo && invForm.desconto && (
+                <div style={{ background: "#fdf0f5", borderRadius: 10, padding: "12px 14px", marginBottom: 14, fontSize: 13 }}>
+                  <div style={{ color: "#6d4c61", marginBottom: 4 }}>Valor pago: <strong style={{ color: "#c2185b" }}>{fmt(invForm.valor_catalogo * (1 - invForm.desconto / 100))}</strong></div>
+                  <div style={{ color: "#6d4c61" }}>Lucro bruto: <strong style={{ color: "#2e7d32" }}>{fmt(invForm.valor_catalogo * (invForm.desconto / 100))}</strong></div>
+                </div>
+              )}
               <div className="modal-btns">
                 <button className="btn-cancelar" onClick={() => setModalInv(false)}>Cancelar</button>
                 <button className="btn-salvar" onClick={salvarInv}>Salvar</button>

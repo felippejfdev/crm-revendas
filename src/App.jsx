@@ -201,7 +201,7 @@ export default function App() {
   const [margemTemp, setMargemTemp] = useState(50);
   const [modalPedido, setModalPedido] = useState(false);
   const [modalInv, setModalInv] = useState(false);
-  const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", data: hoje(), mes: "2026-05", origem: "" });
+  const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", data: hoje(), mes: "", origem: "", estoque: false });
   const [invForm, setInvForm] = useState({ descricao: "", valor_catalogo: "", desconto: "", data: hoje(), mes: "" });
 
   useEffect(() => {
@@ -264,6 +264,7 @@ export default function App() {
 
   const totalVendido = pedidosMes.reduce((s, p) => s + Number(p.valor), 0);
   const totalRecebido = pedidosMes.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
+  const lucroEstoque = pedidosMes.reduce((s, p) => p.estoque ? s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas : s, 0);
   const aReceber = totalVendido - totalRecebido;
   const totalInv = invMes.reduce((s, i) => s + Number(i.valor_pago || i.valor), 0);
   const totalCatalogo = invMes.reduce((s, i) => s + Number(i.valor_catalogo || i.valor), 0);
@@ -278,7 +279,7 @@ export default function App() {
       const vendido = pedidosM.reduce((s, p) => s + Number(p.valor), 0);
       const recebido = pedidosM.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
       const investido = invM.reduce((s, i) => s + Number(i.valor), 0);
-      const lucroM = recebido - investido;
+      const lucroM = invM.reduce((s, i) => s + Number(i.lucro_bruto || 0), 0);
       const margemM = margens[m] || 0;
       return {
         mes: m.slice(5),
@@ -502,7 +503,8 @@ export default function App() {
                   { label: "Total vendido", val: fmt(totalVendido), cor: "#c2185b" },
                   { label: "Já recebido", val: fmt(totalRecebido), cor: "#2e7d32" },
                   { label: "Ainda a receber", val: fmt(aReceber), cor: "#c62828" },
-                  { label: "Saldo final", val: fmt(totalRecebido - totalInv), cor: (totalRecebido - totalInv) >= 0 ? "#2e7d32" : "#c62828" },
+                  { label: "Lucro do estoque", val: fmt(lucroEstoque), cor: "#2e7d32" },
+                  { label: "Saldo final", val: fmt(totalRecebido - totalInv + lucroEstoque), cor: (totalRecebido - totalInv + lucroEstoque) >= 0 ? "#2e7d32" : "#c62828" },
                 ].map(r => (
                   <div key={r.label} className="fin-row">
                     <span className="fin-label">{r.label}</span>
@@ -571,8 +573,7 @@ export default function App() {
                       <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#b0819a" }} />
                       <YAxis tick={{ fontSize: 10, fill: "#b0819a" }} tickFormatter={v => `R$${v}`} width={55} />
                       <Tooltip formatter={(v) => fmt(v)} labelFormatter={l => `Mês: ${l}`} contentStyle={{ borderRadius: 10, border: "1px solid #fce4ec", fontSize: 12 }} />
-                      <Bar dataKey="meta" name="Ganho Pessoal" fill="#c2185b" radius={[6, 6, 0, 0]} />
-                      <Bar dataKey="lucro" name="Lucro Total" fill="#f48fb1" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="lucro" name="Lucro Bruto" fill="#c2185b" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -636,6 +637,37 @@ export default function App() {
                   <option value="Outro">Outro</option>
                 </select>
               </div>
+
+
+              <div className="field">
+                <label>Produto do estoque?</label>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, estoque: !f.estoque }))}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: 10,
+                      border: form.estoque ? "none" : "1.5px solid #fce4ec",
+                      background: form.estoque ? "linear-gradient(135deg, #c2185b, #e91e8c)" : "#fff",
+                      color: form.estoque ? "#fff" : "#b0819a",
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    {form.estoque ? "✓ Sim, produto do estoque" : "Não"}
+                  </button>
+                </div>
+                {form.estoque && (
+                  <div style={{ fontSize: 12, color: "#2e7d32", marginTop: 6 }}>
+                    ✓ Lucro = 100% do valor vendido
+                  </div>
+                )}
+              </div>
+
+
 
 
               <div className="modal-btns">

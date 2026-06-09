@@ -539,32 +539,7 @@ export default function App() {
 
           {tab === "financeiro" && (
             <>
-              <div className="fin-section">
-                <div className="fin-title">📦 Saldo de Estoque — {nomeMes(mes)}</div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <span style={{ fontSize: 13, color: "#6d4c61" }}>
-                    Estoque inicial: <strong>{fmt(estoqueInicial)}</strong>
-                  </span>
-                  <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setEstoqueTemp(estoqueInicial); setEditandoEstoque(true); }}>
-                    ✏️ Editar
-                  </button>
-                </div>
-                {editandoEstoque && (
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
-                    <input type="number" value={estoqueTemp} onChange={e => setEstoqueTemp(e.target.value)} style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #fce4ec", fontFamily: "DM Sans, sans-serif", fontSize: 14 }} placeholder="Valor em R$" />
-                    <button className="btn-novo" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => salvarEstoque(estoqueTemp)}>Salvar</button>
-                    <button className="btn-cancelar" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setEditandoEstoque(false)}>Cancelar</button>
-                  </div>
-                )}
-                {[
-                  { label: "Estoque inicial", val: fmt(estoqueInicial), cor: "#1565c0" },
-                ].map(r => (
-                  <div key={r.label} className="fin-row">
-                    <span className="fin-label">{r.label}</span>
-                    <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
-                  </div>
-                ))}
-              </div>
+           
 
               <div className="fin-section">
                 <div className="fin-title">Resumo de {nomeMes(mes)}</div>
@@ -704,34 +679,7 @@ export default function App() {
               </div>
 
 
-              <div className="field">
-                <label>Produto do estoque?</label>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
-                  <button
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, estoque: !f.estoque }))}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: 10,
-                      border: form.estoque ? "none" : "1.5px solid #fce4ec",
-                      background: form.estoque ? "linear-gradient(135deg, #c2185b, #e91e8c)" : "#fff",
-                      color: form.estoque ? "#fff" : "#b0819a",
-                      fontFamily: "DM Sans, sans-serif",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer"
-                    }}
-                  >
-                    {form.estoque ? "✓ Sim, produto do estoque" : "Não"}
-                  </button>
-                </div>
-                {form.estoque && (
-                  <div style={{ fontSize: 12, color: "#2e7d32", marginTop: 6 }}>
-                    ✓ Lucro = 100% do valor vendido
-                  </div>
-                )}
-              </div>
-
+           
 
 
 

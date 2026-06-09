@@ -246,27 +246,27 @@ export default function App() {
   };
 
   const carregarEstoque = async () => {
-  const { data } = await supabase.from("estoque").select("*");
-  if (data) {
-    const e = {};
-    data.forEach(d => e[d.mes] = d.estoque_inicial);
-    setEstoques(e);
-  }
-};
+    const { data } = await supabase.from("estoque").select("*");
+    if (data) {
+      const e = {};
+      data.forEach(d => e[d.mes] = d.estoque_inicial);
+      setEstoques(e);
+    }
+  };
 
-const salvarEstoque = async (valor) => {
-  const { error } = await supabase.from("estoque").upsert({
-    user_id: session.user.id,
-    mes,
-    estoque_inicial: Number(valor)
-  }, { onConflict: "user_id,mes" });
-  if (error) {
-    alert("Erro ao salvar: " + error.message);
-  } else {
-    setEstoques(e => ({ ...e, [mes]: Number(valor) }));
-    setEditandoEstoque(false);
-  }
-};
+  const salvarEstoque = async (valor) => {
+    const { error } = await supabase.from("estoque").upsert({
+      user_id: session.user.id,
+      mes,
+      estoque_inicial: Number(valor)
+    }, { onConflict: "user_id,mes" });
+    if (error) {
+      alert("Erro ao salvar: " + error.message);
+    } else {
+      setEstoques(e => ({ ...e, [mes]: Number(valor) }));
+      setEditandoEstoque(false);
+    }
+  };
 
 
 
@@ -306,13 +306,13 @@ const salvarEstoque = async (valor) => {
   // Recebido de produtos normais (não estoque)
   const recebidoNormal = totalRecebido - totalEstoque;
 
- // SALDO DE ESTOQUE = Estoque Inicial + Total Comprado - Total Vendido
-const estoqueInicial = estoques[mes] || 0;
-const saldoEstoque = estoqueInicial + totalCatalogo - totalVendido;
+  // SALDO DE ESTOQUE = Estoque Inicial + Total Comprado - Total Vendido
+  const estoqueInicial = estoques[mes] || 0;
+  const saldoEstoque = estoqueInicial + totalCatalogo - totalVendido;
 
-// SALDO FINAL = recebido normal - investido + recebido do estoque
-const saldoFinal = recebidoNormal - totalInv + totalEstoque;
-const lucro = saldoFinal;
+  // SALDO FINAL = recebido normal - investido + recebido do estoque
+  const saldoFinal = recebidoNormal - totalInv + totalEstoque;
+  const lucro = saldoFinal;
 
   const dadosGrafico = useMemo(() => {
     return MESES.map(m => {
@@ -535,58 +535,51 @@ const lucro = saldoFinal;
           )}
 
 
-  
 
-       {tab === "financeiro" && (
-  <>
-    <div className="fin-section">
-      <div className="fin-title">📦 Saldo de Estoque — {nomeMes(mes)}</div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <span style={{ fontSize: 13, color: "#6d4c61" }}>
-          Estoque inicial: <strong>{fmt(estoqueInicial)}</strong>
-        </span>
-        <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setEstoqueTemp(estoqueInicial); setEditandoEstoque(true); }}>
-          ✏️ Editar
-        </button>
-      </div>
-      {editandoEstoque && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
-          <input type="number" value={estoqueTemp} onChange={e => setEstoqueTemp(e.target.value)} style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #fce4ec", fontFamily: "DM Sans, sans-serif", fontSize: 14 }} placeholder="Valor em R$" />
-          <button className="btn-novo" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => salvarEstoque(estoqueTemp)}>Salvar</button>
-          <button className="btn-cancelar" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setEditandoEstoque(false)}>Cancelar</button>
-        </div>
-      )}
-      {[
-        { label: "Estoque inicial", val: fmt(estoqueInicial), cor: "#1565c0" },
-        { label: "Total comprado no mês", val: fmt(totalCatalogo), cor: "#c2185b" },
-        { label: "Total vendido no mês", val: fmt(totalVendido), cor: "#2e7d32" },
-        { label: "Saldo de estoque", val: fmt(saldoEstoque), cor: saldoEstoque >= 0 ? "#2e7d32" : "#c62828" },
-      ].map(r => (
-        <div key={r.label} className="fin-row">
-          <span className="fin-label">{r.label}</span>
-          <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
-        </div>
-      ))}
-    </div>
 
-    <div className="fin-section">
-      <div className="fin-title">Resumo de {nomeMes(mes)}</div>
-      {[
-        { label: "Total do catálogo", val: fmt(totalCatalogo), cor: "#c2185b" },
-        { label: "Total pago (investido)", val: fmt(totalInv), cor: "#1565c0" },
-        { label: "Lucro potencial dos produtos", val: fmt(lucroInv), cor: "#2e7d32" },
-        { label: "Total vendido no mês", val: fmt(totalVendido), cor: "#c2185b" },
-        { label: "Já recebido", val: fmt(totalRecebido), cor: "#2e7d32" },
-        { label: "Ainda a receber", val: fmt(aReceber), cor: "#c62828" },
-        { label: "Recebido do estoque", val: fmt(totalEstoque), cor: "#2e7d32" },
-        { label: "Saldo final", val: fmt(saldoFinal), cor: saldoFinal >= 0 ? "#2e7d32" : "#c62828" },
-      ].map(r => (
-        <div key={r.label} className="fin-row">
-          <span className="fin-label">{r.label}</span>
-          <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
-        </div>
-      ))}
-    </div>
+          {tab === "financeiro" && (
+            <>
+              <div className="fin-section">
+                <div className="fin-title">📦 Saldo de Estoque — {nomeMes(mes)}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <span style={{ fontSize: 13, color: "#6d4c61" }}>
+                    Estoque inicial: <strong>{fmt(estoqueInicial)}</strong>
+                  </span>
+                  <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setEstoqueTemp(estoqueInicial); setEditandoEstoque(true); }}>
+                    ✏️ Editar
+                  </button>
+                </div>
+                {editandoEstoque && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
+                    <input type="number" value={estoqueTemp} onChange={e => setEstoqueTemp(e.target.value)} style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #fce4ec", fontFamily: "DM Sans, sans-serif", fontSize: 14 }} placeholder="Valor em R$" />
+                    <button className="btn-novo" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => salvarEstoque(estoqueTemp)}>Salvar</button>
+                    <button className="btn-cancelar" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setEditandoEstoque(false)}>Cancelar</button>
+                  </div>
+                )}
+                {[
+                  { label: "Estoque inicial", val: fmt(estoqueInicial), cor: "#1565c0" },
+                ].map(r => (
+                  <div key={r.label} className="fin-row">
+                    <span className="fin-label">{r.label}</span>
+                    <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="fin-section">
+                <div className="fin-title">Resumo de {nomeMes(mes)}</div>
+                {[
+                  { label: "Total em produtos", val: fmt(totalCatalogo), cor: "#c2185b" },
+                  { label: "Total pago (investido)", val: fmt(totalInv), cor: "#1565c0" },
+                  { label: "Já recebido", val: fmt(totalRecebido), cor: "#2e7d32" },
+                  { label: "Ainda a receber", val: fmt(aReceber), cor: "#c62828" },
+                ].map(r => (
+                  <div key={r.label} className="fin-row">
+                    <span className="fin-label">{r.label}</span>
+                    <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
+                  </div>
+                ))}
+              </div>
 
 
               <div className="fin-section">

@@ -199,6 +199,9 @@ export default function App() {
   const [margens, setMargens] = useState({});
   const [editandoMargem, setEditandoMargem] = useState(false);
   const [margemTemp, setMargemTemp] = useState(50);
+  const [estoques, setEstoques] = useState({});
+  const [editandoEstoque, setEditandoEstoque] = useState(false);
+  const [estoqueTemp, setEstoqueTemp] = useState(0);
   const [modalPedido, setModalPedido] = useState(false);
   const [modalInv, setModalInv] = useState(false);
   const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", data: hoje(), mes: "", origem: "", estoque: false });
@@ -219,6 +222,7 @@ export default function App() {
       carregarPedidos();
       carregarInvestimentos();
       carregarMargens();
+      carregarEstoque();
     }
   }, [session]);
 
@@ -241,6 +245,31 @@ export default function App() {
     }
   };
 
+  const carregarEstoque = async () => {
+  const { data } = await supabase.from("estoque").select("*");
+  if (data) {
+    const e = {};
+    data.forEach(d => e[d.mes] = d.estoque_inicial);
+    setEstoques(e);
+  }
+};
+
+const salvarEstoque = async (valor) => {
+  const { error } = await supabase.from("estoque").upsert({
+    user_id: session.user.id,
+    mes,
+    estoque_inicial: Number(valor)
+  }, { onConflict: "user_id,mes" });
+  if (error) {
+    alert("Erro ao salvar: " + error.message);
+  } else {
+    setEstoques(e => ({ ...e, [mes]: Number(valor) }));
+    setEditandoEstoque(false);
+  }
+};
+
+
+
   const salvarMargem = async (valor) => {
     const { data, error } = await supabase.from("margens").upsert({
       user_id: session.user.id,
@@ -262,15 +291,28 @@ export default function App() {
 
   const invMes = useMemo(() => investimentos.filter(i => i.mes === mes), [investimentos, mes]);
 
+  // PEDIDOS
   const totalVendido = pedidosMes.reduce((s, p) => s + Number(p.valor), 0);
   const totalRecebido = pedidosMes.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
-  const lucroEstoque = pedidosMes.reduce((s, p) => p.estoque ? s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas : s, 0);
   const aReceber = totalVendido - totalRecebido;
-  const totalInv = invMes.reduce((s, i) => s + Number(i.valor_pago || i.valor), 0);
-  const totalCatalogo = invMes.reduce((s, i) => s + Number(i.valor_catalogo || i.valor), 0);
-  const lucroInv = invMes.reduce((s, i) => s + Number(i.lucro_bruto || 0), 0);
-  const lucro = totalRecebido - totalInv;
 
+  // INVESTIMENTOS (compras com desconto)
+  const totalCatalogo = invMes.reduce((s, i) => s + Number(i.valor_catalogo || 0), 0);
+  const totalInv = invMes.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
+  const lucroInv = totalRecebido - totalInv;
+  // ESTOQUE (lucro = 100% do valor recebido, pois já foi pago antes)
+  const totalEstoque = pedidosMes.filter(p => p.estoque).reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
+
+  // Recebido de produtos normais (não estoque)
+  const recebidoNormal = totalRecebido - totalEstoque;
+
+ // SALDO DE ESTOQUE = Estoque Inicial + Total Comprado - Total Vendido
+const estoqueInicial = estoques[mes] || 0;
+const saldoEstoque = estoqueInicial + totalCatalogo - totalVendido;
+
+// SALDO FINAL = recebido normal - investido + recebido do estoque
+const saldoFinal = recebidoNormal - totalInv + totalEstoque;
+const lucro = saldoFinal;
 
   const dadosGrafico = useMemo(() => {
     return MESES.map(m => {
@@ -279,7 +321,7 @@ export default function App() {
       const vendido = pedidosM.reduce((s, p) => s + Number(p.valor), 0);
       const recebido = pedidosM.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
       const investido = invM.reduce((s, i) => s + Number(i.valor), 0);
-      const lucroM = invM.reduce((s, i) => s + Number(i.lucro_bruto || 0), 0);
+      const lucroM = recebido - invM.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
       const margemM = margens[m] || 0;
       return {
         mes: m.slice(5),
@@ -492,29 +534,59 @@ export default function App() {
             </>
           )}
 
-          {tab === "financeiro" && (
-            <>
-              <div className="fin-section">
-                <div className="fin-title">Resumo de {nomeMes(mes)}</div>
-                {[
-                  { label: "Total do catálogo", val: fmt(totalCatalogo), cor: "#c2185b" },
-                  { label: "Total pago (investido)", val: fmt(totalInv), cor: "#1565c0" },
-                  { label: "Lucro bruto dos produtos", val: fmt(lucroInv), cor: "#2e7d32" },
-                  { label: "Total vendido", val: fmt(totalVendido), cor: "#c2185b" },
-                  { label: "Já recebido", val: fmt(totalRecebido), cor: "#2e7d32" },
-                  { label: "Ainda a receber", val: fmt(aReceber), cor: "#c62828" },
-                  { label: "Lucro do estoque", val: fmt(lucroEstoque), cor: "#2e7d32" },
-                  { label: "Saldo final", val: fmt(totalRecebido - totalInv + lucroEstoque), cor: (totalRecebido - totalInv + lucroEstoque) >= 0 ? "#2e7d32" : "#c62828" },
-                ].map(r => (
-                  <div key={r.label} className="fin-row">
-                    <span className="fin-label">{r.label}</span>
-                    <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
-                  </div>
-                ))}
-              </div>
 
+  
 
+       {tab === "financeiro" && (
+  <>
+    <div className="fin-section">
+      <div className="fin-title">📦 Saldo de Estoque — {nomeMes(mes)}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <span style={{ fontSize: 13, color: "#6d4c61" }}>
+          Estoque inicial: <strong>{fmt(estoqueInicial)}</strong>
+        </span>
+        <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setEstoqueTemp(estoqueInicial); setEditandoEstoque(true); }}>
+          ✏️ Editar
+        </button>
+      </div>
+      {editandoEstoque && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
+          <input type="number" value={estoqueTemp} onChange={e => setEstoqueTemp(e.target.value)} style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #fce4ec", fontFamily: "DM Sans, sans-serif", fontSize: 14 }} placeholder="Valor em R$" />
+          <button className="btn-novo" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => salvarEstoque(estoqueTemp)}>Salvar</button>
+          <button className="btn-cancelar" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setEditandoEstoque(false)}>Cancelar</button>
+        </div>
+      )}
+      {[
+        { label: "Estoque inicial", val: fmt(estoqueInicial), cor: "#1565c0" },
+        { label: "Total comprado no mês", val: fmt(totalCatalogo), cor: "#c2185b" },
+        { label: "Total vendido no mês", val: fmt(totalVendido), cor: "#2e7d32" },
+        { label: "Saldo de estoque", val: fmt(saldoEstoque), cor: saldoEstoque >= 0 ? "#2e7d32" : "#c62828" },
+      ].map(r => (
+        <div key={r.label} className="fin-row">
+          <span className="fin-label">{r.label}</span>
+          <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
+        </div>
+      ))}
+    </div>
 
+    <div className="fin-section">
+      <div className="fin-title">Resumo de {nomeMes(mes)}</div>
+      {[
+        { label: "Total do catálogo", val: fmt(totalCatalogo), cor: "#c2185b" },
+        { label: "Total pago (investido)", val: fmt(totalInv), cor: "#1565c0" },
+        { label: "Lucro potencial dos produtos", val: fmt(lucroInv), cor: "#2e7d32" },
+        { label: "Total vendido no mês", val: fmt(totalVendido), cor: "#c2185b" },
+        { label: "Já recebido", val: fmt(totalRecebido), cor: "#2e7d32" },
+        { label: "Ainda a receber", val: fmt(aReceber), cor: "#c62828" },
+        { label: "Recebido do estoque", val: fmt(totalEstoque), cor: "#2e7d32" },
+        { label: "Saldo final", val: fmt(saldoFinal), cor: saldoFinal >= 0 ? "#2e7d32" : "#c62828" },
+      ].map(r => (
+        <div key={r.label} className="fin-row">
+          <span className="fin-label">{r.label}</span>
+          <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
+        </div>
+      ))}
+    </div>
 
 
               <div className="fin-section">

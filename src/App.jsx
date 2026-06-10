@@ -16,6 +16,7 @@ const TABS = [
   { id: "pedidos", label: "Pedidos", icon: "🛍️" },
   { id: "clientes", label: "Clientes", icon: "👥" },
   { id: "financeiro", label: "Financeiro", icon: "💰" },
+  { id: "estoque", label: "Estoque", icon: "🏪" },
   { id: "investimentos", label: "Invest.", icon: "📦" },
   { id: "relatorios", label: "Relatórios", icon: "📊" },
 ];
@@ -204,7 +205,7 @@ export default function App() {
   const [estoqueTemp, setEstoqueTemp] = useState(0);
   const [modalPedido, setModalPedido] = useState(false);
   const [modalInv, setModalInv] = useState(false);
-  const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", data: hoje(), mes: "", origem: "", estoque: false });
+  const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", entrada: "0", data: hoje(), mes: "", origem: "", estoque: false });
   const [invForm, setInvForm] = useState({ descricao: "", valor_catalogo: "", desconto: "", data: hoje(), mes: "" });
 
   useEffect(() => {
@@ -293,8 +294,9 @@ export default function App() {
 
   // PEDIDOS
   const totalVendido = pedidosMes.reduce((s, p) => s + Number(p.valor), 0);
-  const totalRecebido = pedidosMes.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
-  const aReceber = totalVendido - totalRecebido;
+  const totalRecebido = pedidosMes.reduce((s, p) => s + Number(p.valor), 0);
+  const totalRecebidoReal = pedidosMes.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
+  const aReceber = totalRecebido - totalRecebidoReal;
 
   // INVESTIMENTOS (compras com desconto)
   const totalCatalogo = invMes.reduce((s, i) => s + Number(i.valor_catalogo || 0), 0);
@@ -402,19 +404,22 @@ export default function App() {
 
   const salvarPedido = async () => {
     if (!form.cliente || !form.produto || !form.valor) return;
+    const entrada = Number(form.entrada) || 0;
+    const valorTotal = Number(form.valor);
+    const parcelas = Number(form.parcelas);
     const { data } = await supabase.from("pedidos").insert([{
       ...form,
-      valor: Number(form.valor),
-      parcelas: Number(form.parcelas),
-      parcelas_pagas: 0,
+      valor: valorTotal,
+      entrada: entrada,
+      parcelas: parcelas,
+      parcelas_pagas: entrada > 0 ? 1 : 0,
       entregue: false,
       user_id: session.user.id
     }]).select();
     if (data) setPedidos(ps => [data[0], ...ps]);
-    setForm({ cliente: "", produto: "", valor: "", parcelas: "1", data: hoje(), mes });
+    setForm({ cliente: "", produto: "", valor: "", parcelas: "1", entrada: "0", data: hoje(), mes: "", origem: "" });
     setModalPedido(false);
   };
-
   const salvarInv = async () => {
     if (!invForm.descricao || !invForm.valor_catalogo || !invForm.desconto) return;
     const valor_catalogo = Number(invForm.valor_catalogo);
@@ -462,7 +467,7 @@ export default function App() {
 
         <div className="cards">
           <div className="card pink"><div className="card-label">Vendido</div><div className="card-value">{fmt(totalVendido)}</div></div>
-          <div className="card green"><div className="card-label">Recebido</div><div className="card-value">{fmt(totalRecebido)}</div></div>
+          <div className="card green"><div className="card-label">Recebido</div><div className="card-value">{fmt(totalRecebidoReal)}</div></div>
           <div className="card red"><div className="card-label">A Receber</div><div className="card-value">{fmt(aReceber)}</div></div>
           <div className="card blue"><div className="card-label">Investido</div><div className="card-value">{fmt(totalInv)}</div></div>
           <div className={`card ${lucro >= 0 ? "gold" : "red"} card-lucro`}><div className="card-label">Lucro Líquido</div><div className="card-value">{fmt(lucro)}</div></div>
@@ -485,7 +490,9 @@ export default function App() {
               </div>
               {pedidosMes.length === 0 && <div className="empty"><div className="empty-icon">🛍️</div>Nenhum pedido neste mês</div>}
               {pedidosMes.map(p => {
-                const valParcela = Number(p.valor) / p.parcelas;
+                const entrada = Number(p.entrada) || 0;
+                const restante = Number(p.valor) - entrada;
+                const valParcela = p.parcelas > 0 ? restante / p.parcelas : restante;
                 const Débito = valParcela * (p.parcelas - p.parcelas_pagas);
                 return (
                   <div key={p.id} className="pedido-card">
@@ -497,7 +504,9 @@ export default function App() {
                       {Array.from({ length: p.parcelas }).map((_, i) => (
                         <div key={i} className={`parcela-dot ${i < p.parcelas_pagas ? "pago" : "aberto"}`} />
                       ))}
-                      <span className="parcelas-info">{p.parcelas_pagas}/{p.parcelas} parcelas · {fmt(valParcela)} cada</span>
+                      <span className="parcelas-info">
+                        {entrada > 0 ? `Entrada ${fmt(entrada)} + ` : ""}{p.parcelas_pagas}/{p.parcelas} parcelas · {fmt(valParcela)} cada
+                      </span>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <span className={`status-badge ${p.entregue ? "status-entregue" : "status-pendente"}`}>{p.entregue ? "✓ Entregue" : "⏳ Pendente"}</span>
@@ -539,7 +548,7 @@ export default function App() {
 
           {tab === "financeiro" && (
             <>
-           
+
 
               <div className="fin-section">
                 <div className="fin-title">Resumo de {nomeMes(mes)}</div>
@@ -622,6 +631,53 @@ export default function App() {
           )}
 
 
+          {tab === "estoque" && (
+            <>
+              <div className="fin-section">
+                <div className="fin-title">🏪 Estoque Inicial — {nomeMes(mes)}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <span style={{ fontSize: 13, color: "#6d4c61" }}>
+                    Valor em estoque: <strong style={{ color: "#c2185b" }}>{fmt(estoques[mes] || 0)}</strong>
+                  </span>
+                  <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setEstoqueTemp(estoques[mes] || 0); setEditandoEstoque(true); }}>
+                    ✏️ Editar
+                  </button>
+                </div>
+                {editandoEstoque && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
+                    <input
+                      type="number"
+                      value={estoqueTemp}
+                      onChange={e => setEstoqueTemp(e.target.value)}
+                      style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #fce4ec", fontFamily: "DM Sans, sans-serif", fontSize: 14 }}
+                      placeholder="Valor em R$"
+                    />
+                    <button className="btn-novo" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => salvarEstoque(estoqueTemp)}>Salvar</button>
+                    <button className="btn-cancelar" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => setEditandoEstoque(false)}>Cancelar</button>
+                  </div>
+                )}
+                <div style={{ background: "#fdf0f5", borderRadius: 10, padding: "12px 14px", marginTop: 8, fontSize: 13, color: "#6d4c61" }}>
+                  💡 Coloque aqui o valor dos produtos que você já tinha antes de começar a usar o app. O lucro desses produtos será 100% do valor vendido.
+                </div>
+              </div>
+
+              <div className="fin-section">
+                <div className="fin-title">Resumo do Estoque</div>
+                {[
+                  { label: "Estoque inicial", val: fmt(estoques[mes] || 0), cor: "#1565c0" },
+                  { label: "Vendas do estoque", val: fmt(totalEstoque), cor: "#2e7d32" },
+                  { label: "Saldo restante", val: fmt((estoques[mes] || 0) - totalEstoque), cor: ((estoques[mes] || 0) - totalEstoque) >= 0 ? "#2e7d32" : "#c62828" },
+                ].map(r => (
+                  <div key={r.label} className="fin-row">
+                    <span className="fin-label">{r.label}</span>
+                    <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+
 
           {tab === "investimentos" && (
             <>
@@ -653,7 +709,7 @@ export default function App() {
           <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModalPedido(false)}>
             <div className="modal">
               <div className="modal-title">Novo Pedido ✦</div>
-              {[["Cliente", "cliente", "text", "Nome da cliente"], ["Produto", "produto", "text", "Ex: Perfume Rose"], ["Valor Total (R$)", "valor", "number", "0,00"], ["Parcelas", "parcelas", "number", "1"], ["Data do Pedido", "data", "date", ""]].map(([label, key, type, ph]) => (
+              {[["Cliente", "cliente", "text", "Nome da cliente"], ["Produto", "produto", "text", "Ex: Perfume Rose"], ["Valor Total (R$)", "valor", "number", "0,00"], ["Entrada (R$)", "entrada", "number", "0,00"], ["Parcelas restantes", "parcelas", "number", "1"], ["Data do Pedido", "data", "date", ""]].map(([label, key, type, ph]) => (
                 <div className="field" key={key}>
                   <label>{label}</label>
                   <input type={type} placeholder={ph} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
@@ -665,6 +721,15 @@ export default function App() {
                   {MESES.map(m => <option key={m} value={m}>{nomeMes(m)}</option>)}
                 </select>
               </div>
+
+
+
+              {form.valor && form.entrada && Number(form.entrada) > 0 && (
+                <div style={{ background: "#fdf0f5", borderRadius: 10, padding: "12px 14px", marginBottom: 14, fontSize: 13 }}>
+                  <div style={{ color: "#6d4c61", marginBottom: 4 }}>Restante após entrada: <strong style={{ color: "#c2185b" }}>{fmt(Number(form.valor) - Number(form.entrada))}</strong></div>
+                  <div style={{ color: "#6d4c61" }}>Valor de cada parcela: <strong style={{ color: "#2e7d32" }}>{fmt((Number(form.valor) - Number(form.entrada)) / Number(form.parcelas))}</strong></div>
+                </div>
+              )}
 
               <div className="field">
                 <label>Como conheceu</label>
@@ -679,7 +744,38 @@ export default function App() {
               </div>
 
 
-           
+
+
+              <div className="field">
+                <label>Produto do estoque inicial?</label>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, estoque: !f.estoque }))}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: 10,
+                      border: form.estoque ? "none" : "1.5px solid #fce4ec",
+                      background: form.estoque ? "linear-gradient(135deg, #c2185b, #e91e8c)" : "#fff",
+                      color: form.estoque ? "#fff" : "#b0819a",
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    {form.estoque ? "✓ Sim, do estoque inicial" : "Não"}
+                  </button>
+                </div>
+                {form.estoque && (
+                  <div style={{ fontSize: 12, color: "#2e7d32", marginTop: 6 }}>
+                    ✓ Lucro = 100% do valor recebido
+                  </div>
+                )}
+              </div>
+
+
+
 
 
 

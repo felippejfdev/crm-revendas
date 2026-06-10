@@ -292,7 +292,7 @@ export default function App() {
 
   const invMes = useMemo(() => investimentos.filter(i => i.mes === mes), [investimentos, mes]);
 
- // PEDIDOS
+  // PEDIDOS
   const totalVendido = pedidosMes.reduce((s, p) => s + Number(p.valor), 0);
   const totalRecebidoReal = pedidosMes.reduce((s, p) => {
     const entrada = Number(p.entrada) || 0;
@@ -315,8 +315,24 @@ export default function App() {
     return s + entrada + (valParcela * p.parcelas_pagas);
   }, 0);
 
-  // LUCRO
+ // LUCRO
   const lucro = totalVendido - totalInv + totalEstoque;
+
+  // PARCELAS FUTURAS
+  const parcelasFuturas = pedidosMes.flatMap(p => {
+    const entrada = Number(p.entrada) || 0;
+    const restante = Number(p.valor) - entrada;
+    const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
+    const parcelasPendentes = p.parcelas - p.parcelas_pagas;
+    if (parcelasPendentes <= 0) return [];
+    const dataBase = new Date(p.data);
+    return Array.from({ length: parcelasPendentes }, (_, i) => {
+      const dataVenc = new Date(dataBase);
+      dataVenc.setMonth(dataVenc.getMonth() + i + 1);
+      const mesVenc = `${dataVenc.getFullYear()}-${String(dataVenc.getMonth() + 1).padStart(2, "0")}`;
+      return { cliente: p.cliente, produto: p.produto, valor: valParcela, mes: mesVenc };
+    }).filter(pf => pf.mes !== mes);
+  });
 
   const dadosGrafico = useMemo(() => {
     return MESES.map(m => {
@@ -414,7 +430,7 @@ export default function App() {
       valor: valorTotal,
       entrada: entrada,
       parcelas: parcelas,
-      parcelas_pagas: entrada > 0 ? 1 : 0,
+     parcelas_pagas: 0,
       entregue: false,
       user_id: session.user.id
     }]).select();
@@ -557,7 +573,7 @@ export default function App() {
                 {[
                   { label: "Total em produtos", val: fmt(totalCatalogo), cor: "#c2185b" },
                   { label: "Total pago (investido)", val: fmt(totalInv), cor: "#1565c0" },
-                  { label: "Já recebido", val: fmt(totalRecebido), cor: "#2e7d32" },
+                  { label: "Já recebido", val: fmt(totalRecebidoReal), cor: "#2e7d32" },
                   { label: "Ainda a receber", val: fmt(aReceber), cor: "#c62828" },
                 ].map(r => (
                   <div key={r.label} className="fin-row">

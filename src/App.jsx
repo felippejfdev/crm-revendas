@@ -292,7 +292,7 @@ export default function App() {
 
   const invMes = useMemo(() => investimentos.filter(i => i.mes === mes), [investimentos, mes]);
 
-  // PEDIDOS
+ // PEDIDOS
   const totalVendido = pedidosMes.reduce((s, p) => s + Number(p.valor), 0);
   const totalRecebidoReal = pedidosMes.reduce((s, p) => {
     const entrada = Number(p.entrada) || 0;
@@ -302,7 +302,12 @@ export default function App() {
   }, 0);
   const aReceber = totalVendido - totalRecebidoReal;
 
-  // ESTOQUE (lucro = 100% do valor recebido)
+  // INVESTIMENTOS
+  const totalCatalogo = invMes.reduce((s, i) => s + Number(i.valor_catalogo || 0), 0);
+  const totalInv = invMes.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
+
+  // ESTOQUE INICIAL
+  const estoqueInicial = estoques[mes] || 0;
   const totalEstoque = pedidosMes.filter(p => p.estoque).reduce((s, p) => {
     const entrada = Number(p.entrada) || 0;
     const restante = Number(p.valor) - entrada;
@@ -310,50 +315,8 @@ export default function App() {
     return s + entrada + (valParcela * p.parcelas_pagas);
   }, 0);
 
-
-  // LUCRO = vendas do mês - investido + lucro do estoque
-  const recebidoNormal = totalRecebidoReal - totalEstoque;
-  const lucro = totalVendido - totalInv + (estoques[mes] || 0);
-  const estoqueInicial = estoques[mes] || 0;
-  const saldoEstoque = estoqueInicial + totalCatalogo - totalVendido;
-  const saldoFinal = lucro;
-
-
-
-  // PARCELAS FUTURAS (parcelas de pedidos deste mês que vencem nos próximos meses)
-  const parcelasFuturas = pedidosMes.flatMap(p => {
-    const entrada = Number(p.entrada) || 0;
-    const restante = Number(p.valor) - entrada;
-    const valParcela = p.parcelas > 0 ? restante / p.parcelas : restante;
-    const parcelasPendentes = p.parcelas - p.parcelas_pagas;
-    if (parcelasPendentes <= 0) return [];
-    const dataBase = new Date(p.data);
-    return Array.from({ length: parcelasPendentes }, (_, i) => {
-      const dataVenc = new Date(dataBase);
-      dataVenc.setMonth(dataVenc.getMonth() + p.parcelas_pagas + i + 1);
-      const mesVenc = `${dataVenc.getFullYear()}-${String(dataVenc.getMonth() + 1).padStart(2, "0")}`;
-      return { cliente: p.cliente, produto: p.produto, valor: valParcela, mes: mesVenc };
-    }).filter(pf => pf.mes !== mes);
-  });
-
-
-  // INVESTIMENTOS (compras com desconto)
-  const totalCatalogo = invMes.reduce((s, i) => s + Number(i.valor_catalogo || 0), 0);
-  const totalInv = invMes.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
-  const lucroInv = totalRecebido - totalInv;
-  // ESTOQUE (lucro = 100% do valor recebido, pois já foi pago antes)
-  const totalEstoque = pedidosMes.filter(p => p.estoque).reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
-
-  // Recebido de produtos normais (não estoque)
-  const recebidoNormal = totalRecebido - totalEstoque;
-
-  // SALDO DE ESTOQUE = Estoque Inicial + Total Comprado - Total Vendido
-
-  const saldoEstoque = estoqueInicial + totalCatalogo - totalVendido;
-
-  // SALDO FINAL = recebido normal - investido + recebido do estoque
-  const saldoFinal = recebidoNormal - totalInv + totalEstoque;
-  const lucro = saldoFinal;
+  // LUCRO
+  const lucro = totalVendido - totalInv + totalEstoque;
 
   const dadosGrafico = useMemo(() => {
     return MESES.map(m => {

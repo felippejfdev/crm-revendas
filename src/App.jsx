@@ -310,9 +310,6 @@ export default function App() {
     return s + entrada + (valParcela * p.parcelas_pagas);
   }, 0);
 
-  // INVESTIMENTOS
-  const totalCatalogo = invMes.reduce((s, i) => s + Number(i.valor_catalogo || 0), 0);
-  const totalInv = invMes.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
 
   // LUCRO = vendas do mês - investido + lucro do estoque
   const recebidoNormal = totalRecebidoReal - totalEstoque;
@@ -351,7 +348,7 @@ export default function App() {
   const recebidoNormal = totalRecebido - totalEstoque;
 
   // SALDO DE ESTOQUE = Estoque Inicial + Total Comprado - Total Vendido
-  const estoqueInicial = estoques[mes] || 0;
+
   const saldoEstoque = estoqueInicial + totalCatalogo - totalVendido;
 
   // SALDO FINAL = recebido normal - investido + recebido do estoque

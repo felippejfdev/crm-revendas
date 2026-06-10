@@ -294,9 +294,32 @@ export default function App() {
 
   // PEDIDOS
   const totalVendido = pedidosMes.reduce((s, p) => s + Number(p.valor), 0);
-  const totalRecebido = pedidosMes.reduce((s, p) => s + Number(p.valor), 0);
-  const totalRecebidoReal = pedidosMes.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
-  const aReceber = totalRecebido - totalRecebidoReal;
+  const totalRecebidoReal = pedidosMes.reduce((s, p) => {
+    const entrada = Number(p.entrada) || 0;
+    const restante = Number(p.valor) - entrada;
+    const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
+    return s + entrada + (valParcela * p.parcelas_pagas);
+  }, 0);
+  const aReceber = totalVendido - totalRecebidoReal;
+
+  // ESTOQUE (lucro = 100% do valor recebido)
+  const totalEstoque = pedidosMes.filter(p => p.estoque).reduce((s, p) => {
+    const entrada = Number(p.entrada) || 0;
+    const restante = Number(p.valor) - entrada;
+    const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
+    return s + entrada + (valParcela * p.parcelas_pagas);
+  }, 0);
+
+  // INVESTIMENTOS
+  const totalCatalogo = invMes.reduce((s, i) => s + Number(i.valor_catalogo || 0), 0);
+  const totalInv = invMes.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
+
+  // LUCRO = vendas do mês - investido + lucro do estoque
+  const recebidoNormal = totalRecebidoReal - totalEstoque;
+  const lucro = totalVendido - totalInv + (estoques[mes] || 0);
+  const estoqueInicial = estoques[mes] || 0;
+  const saldoEstoque = estoqueInicial + totalCatalogo - totalVendido;
+  const saldoFinal = lucro;
 
 
 
@@ -342,7 +365,7 @@ export default function App() {
       const vendido = pedidosM.reduce((s, p) => s + Number(p.valor), 0);
       const recebido = pedidosM.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
       const investido = invM.reduce((s, i) => s + Number(i.valor), 0);
-      const lucroM = recebido - invM.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
+      const lucroM = vendido - invM.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
       const margemM = margens[m] || 0;
       return {
         mes: m.slice(5),

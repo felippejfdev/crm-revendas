@@ -337,7 +337,16 @@ export default function App() {
       const vendido = pedidosM.reduce((s, p) => s + Number(p.valor), 0);
       const recebido = pedidosM.reduce((s, p) => s + (Number(p.valor) / p.parcelas) * p.parcelas_pagas, 0);
       const investido = invM.reduce((s, i) => s + Number(i.valor), 0);
-      const lucroM = vendido - invM.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
+      const recebidoM = pedidosM.reduce((s, p) => {
+        const entrada = Number(p.entrada) || 0;
+        if (p.parcelas <= 1) {
+          return s + (p.parcelas_pagas >= 1 ? Number(p.valor) : 0);
+        }
+        const restante = Number(p.valor) - entrada;
+        const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
+        return s + entrada + (valParcela * p.parcelas_pagas);
+      }, 0);
+      const lucroM = recebidoM - invM.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
       const margemM = margens[m] || 0;
       return {
         mes: m.slice(5),

@@ -310,10 +310,19 @@ export default function App() {
 
   // ESTOQUE INICIAL
   const estoqueInicial = estoques[mes] || 0;
-  const totalEstoque = pedidosMes.filter(p => p.estoque).reduce((s, p) => s + Number(p.valor), 0);
+  const totalEstoque = pedidosMes.filter(p => p.estoque).reduce((s, p) => {
+  if (p.parcelas <= 1) {
+    return s + (p.parcelas_pagas >= 1 ? Number(p.valor) : 0);
+  }
+  const entrada = Number(p.entrada) || 0;
+  const restante = Number(p.valor) - entrada;
+  const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
+  return s + entrada + (valParcela * p.parcelas_pagas);
+}, 0);
 
-  // LUCRO = total recebido - investido
-  const lucro = totalRecebidoReal - totalInv;
+// LUCRO = recebido normal - investido + lucro do estoque (100%)
+  const recebidoNormal = totalRecebidoReal - totalEstoque;
+  const lucro = recebidoNormal - totalInv + totalEstoque;
   // PARCELAS FUTURAS - apenas lembrete, não conta no lucro
   const parcelasFuturas = pedidos.filter(p => p.mes && p.cliente && p.parcelas > 0).flatMap(p => {
     const entrada = Number(p.entrada) || 0;
@@ -611,6 +620,7 @@ export default function App() {
                   { label: "Total em produtos (catálogo)", val: fmt(totalCatalogo), cor: "#880e4f" },
                   { label: "Total pago (com desconto)", val: fmt(totalInv), cor: "#1565c0" },
                   { label: "Desconto obtido", val: fmt(totalCatalogo - totalInv), cor: "#2e7d32" },
+                  { label: "Lucro do estoque inicial", val: fmt(totalEstoque), cor: "#2e7d32" },
                 ].map(r => (
                   <div key={r.label} className="fin-row">
                     <span className="fin-label">{r.label}</span>

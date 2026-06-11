@@ -291,11 +291,14 @@ export default function App() {
     )), [pedidos, mes, busca]);
 
   const invMes = useMemo(() => investimentos.filter(i => i.mes === mes), [investimentos, mes]);
-
   // PEDIDOS
   const totalVendido = pedidosMes.reduce((s, p) => s + Number(p.valor), 0);
   const totalRecebidoReal = pedidosMes.reduce((s, p) => {
     const entrada = Number(p.entrada) || 0;
+    if (p.parcelas <= 1) {
+      // À vista: só conta quando marcado como pago
+      return s + (p.parcelas_pagas >= 1 ? Number(p.valor) : 0);
+    }
     const restante = Number(p.valor) - entrada;
     const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
     return s + entrada + (valParcela * p.parcelas_pagas);
@@ -308,18 +311,12 @@ export default function App() {
 
   // ESTOQUE INICIAL
   const estoqueInicial = estoques[mes] || 0;
-  const totalEstoque = pedidosMes.filter(p => p.estoque).reduce((s, p) => {
-    const entrada = Number(p.entrada) || 0;
-    const restante = Number(p.valor) - entrada;
-    const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
-    return s + entrada + (valParcela * p.parcelas_pagas);
-  }, 0);
+  const totalEstoque = pedidosMes.filter(p => p.estoque).reduce((s, p) => s + Number(p.valor), 0);
 
- // LUCRO
-  const lucro = totalVendido - totalInv + totalEstoque;
-
-  // PARCELAS FUTURAS
-  const parcelasFuturas = pedidosMes.flatMap(p => {
+  // LUCRO = total recebido - investido
+  const lucro = totalRecebidoReal - totalInv;
+  // PARCELAS FUTURAS - apenas lembrete, não conta no lucro
+  const parcelasFuturas = pedidos.filter(p => p.mes && p.cliente && p.parcelas > 0).flatMap(p => {
     const entrada = Number(p.entrada) || 0;
     const restante = Number(p.valor) - entrada;
     const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
@@ -328,10 +325,10 @@ export default function App() {
     const dataBase = new Date(p.data);
     return Array.from({ length: parcelasPendentes }, (_, i) => {
       const dataVenc = new Date(dataBase);
-      dataVenc.setMonth(dataVenc.getMonth() + i + 1);
+      dataVenc.setMonth(dataVenc.getMonth() + p.parcelas_pagas + i + 1);
       const mesVenc = `${dataVenc.getFullYear()}-${String(dataVenc.getMonth() + 1).padStart(2, "0")}`;
-      return { cliente: p.cliente, produto: p.produto, valor: valParcela, mes: mesVenc };
-    }).filter(pf => pf.mes !== mes);
+      return { cliente: p.cliente, produto: p.produto, valor: valParcela, mes: mesVenc, mesPedido: p.mes, pedidoId: p.id, parcelaAtual: p.parcelas_pagas, totalParcelas: p.parcelas };
+    });
   });
 
   const dadosGrafico = useMemo(() => {
@@ -419,7 +416,6 @@ export default function App() {
   };
 
 
-
   const salvarPedido = async () => {
     if (!form.cliente || !form.produto || !form.valor) return;
     const entrada = Number(form.entrada) || 0;
@@ -430,12 +426,12 @@ export default function App() {
       valor: valorTotal,
       entrada: entrada,
       parcelas: parcelas,
-     parcelas_pagas: 0,
+      parcelas_pagas: 0,
       entregue: false,
       user_id: session.user.id
     }]).select();
     if (data) setPedidos(ps => [data[0], ...ps]);
-    setForm({ cliente: "", produto: "", valor: "", parcelas: "1", entrada: "0", data: hoje(), mes: "", origem: "" });
+    setForm({ cliente: "", produto: "", valor: "", parcelas: "1", entrada: "0", data: hoje(), mes: "", origem: "", estoque: false });
     setModalPedido(false);
   };
   const salvarInv = async () => {
@@ -507,6 +503,23 @@ export default function App() {
                 <button className="btn-novo" onClick={() => setModalPedido(true)}>+ Novo</button>
               </div>
               {pedidosMes.length === 0 && <div className="empty"><div className="empty-icon">🛍️</div>Nenhum pedido neste mês</div>}
+              {parcelasFuturas.filter(pf => pf.mes === mes).length > 0 && (
+                <div style={{ background: "#e3f2fd", borderRadius: 14, padding: "12px 16px", marginBottom: 14 }}>
+                  <div style={{ fontWeight: 600, color: "#1565c0", fontSize: 14, marginBottom: 8 }}>⏰ Parcelas a receber em {nomeMes(mes)}</div>
+                  {parcelasFuturas.filter(pf => pf.mes === mes).map((pf, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #bbdefb" }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: "#880e4f" }}>{pf.cliente}</div>
+                        <div style={{ fontSize: 11, color: "#b0819a" }}>{pf.produto} · pedido de {nomeMes(pf.mesPedido)}</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ fontSize: 13, color: "#1565c0", fontWeight: 700 }}>{fmt(pf.valor)}</div>
+                        <button className="btn-pagar" onClick={() => pagarParcela(pf.pedidoId, pf.parcelaAtual, pf.totalParcelas)}>💰 Pago</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {pedidosMes.map(p => {
                 const entrada = Number(p.entrada) || 0;
                 const restante = Number(p.valor) - entrada;
@@ -523,16 +536,29 @@ export default function App() {
                         <div key={i} className={`parcela-dot ${i < p.parcelas_pagas ? "pago" : "aberto"}`} />
                       ))}
                       <span className="parcelas-info">
-                        {entrada > 0 ? `Entrada ${fmt(entrada)} + ` : ""}{p.parcelas_pagas}/{p.parcelas} parcelas · {fmt(valParcela)} cada
+                        {entrada > 0
+                          ? `✓ Entrada ${fmt(entrada)} paga · ${p.parcelas} parcelas de ${fmt(valParcela)}`
+                          : p.parcelas <= 1
+                            ? `À vista · ${fmt(p.valor)}`
+                            : `${p.parcelas_pagas}/${p.parcelas} parcelas · ${fmt(valParcela)} cada`
+                        }
                       </span>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <span className={`status-badge ${p.entregue ? "status-entregue" : "status-pendente"}`}>{p.entregue ? "✓ Entregue" : "⏳ Pendente"}</span>
-                      <span className={`status-badge ${Débito === 0 ? "status-quitado" : "status-Débito"}`}>{Débito === 0 ? "✓ Quitado" : `Débito ${fmt(Débito)}`}</span>
+                      {p.parcelas > 1 && (
+                        <span className={`status-badge ${Débito === 0 ? "status-quitado" : "status-Débito"}`}>{Débito === 0 ? "✓ Quitado" : `Débito ${fmt(Débito)}`}</span>
+                      )}
                     </div>
                     <div className="btns-row">
                       {!p.entregue && <button className="btn-entregar" onClick={() => marcarEntregue(p.id)}>📦 Entreguei</button>}
-                      {p.parcelas_pagas < p.parcelas && <button className="btn-pagar" onClick={() => pagarParcela(p.id, p.parcelas_pagas, p.parcelas)}>💰 Parcela Paga</button>}
+                      {p.parcelas <= 1
+                        ? <button className={`btn-pagar`} onClick={() => pagarParcela(p.id, p.parcelas_pagas, 1)} style={{ opacity: p.parcelas_pagas >= 1 ? 0.5 : 1 }}>
+                          {p.parcelas_pagas >= 1 ? "✓ Pago" : "💰 Marcar Pago"}
+                        </button>
+                        : p.parcelas_pagas < p.parcelas && Number(p.entrada) === 0 &&
+                        <button className="btn-pagar" onClick={() => pagarParcela(p.id, p.parcelas_pagas, p.parcelas)}>💰 Parcela Paga</button>
+                      }
                       {p.parcelas_pagas > 0 && <button className="btn-entregar" onClick={() => voltarParcela(p.id, p.parcelas_pagas)}>↩ Voltar Parcela</button>}
                       <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={() => excluirPedido(p.id)}>🗑 Excluir</button>
                     </div>
@@ -571,10 +597,10 @@ export default function App() {
               <div className="fin-section">
                 <div className="fin-title">Resumo de {nomeMes(mes)}</div>
                 {[
-                  { label: "Total em produtos", val: fmt(totalCatalogo), cor: "#c2185b" },
-                  { label: "Total pago (investido)", val: fmt(totalInv), cor: "#1565c0" },
+                  { label: "Total vendido", val: fmt(totalVendido), cor: "#c2185b" },
                   { label: "Já recebido", val: fmt(totalRecebidoReal), cor: "#2e7d32" },
                   { label: "Ainda a receber", val: fmt(aReceber), cor: "#c62828" },
+                  { label: "Total investido", val: fmt(totalInv), cor: "#1565c0" },
                 ].map(r => (
                   <div key={r.label} className="fin-row">
                     <span className="fin-label">{r.label}</span>
@@ -583,45 +609,21 @@ export default function App() {
                 ))}
               </div>
 
-              <div className="fin-section">
-                <div className="fin-title">Parcelas em aberto — {nomeMes(mes)}</div>
-                {pedidosMes.filter(p => p.parcelas_pagas < p.parcelas).length === 0
-                  ? <div style={{ color: "#2e7d32", fontSize: 13 }}>✓ Todas as clientes estão em dia!</div>
-                  : pedidosMes.filter(p => p.parcelas_pagas < p.parcelas).map(p => {
-                    const entrada = Number(p.entrada) || 0;
-                    const restante = Number(p.valor) - entrada;
-                    const valParcela = p.parcelas > 0 ? restante / p.parcelas : restante;
-                    return (
-                      <div key={p.id} className="fin-row">
-                        <div><div style={{ fontWeight: 600, fontSize: 14, color: "#880e4f" }}>{p.cliente}</div><div style={{ fontSize: 11, color: "#b0819a" }}>{p.produto}</div></div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 13, color: "#c2185b", fontWeight: 600 }}>{p.parcelas - p.parcelas_pagas}x parcela</div>
-                          <div style={{ fontSize: 12, color: "#c62828", fontWeight: 700 }}>{fmt(valParcela * (p.parcelas - p.parcelas_pagas))}</div>
-                        </div>
-                      </div>
-                    );
-                  })
-                }
-              </div>
 
-              {parcelasFuturas.length > 0 && (
-                <div className="fin-section">
-                  <div className="fin-title">Parcelas futuras a receber</div>
-                  {[...new Set(parcelasFuturas.map(pf => pf.mes))].sort().map(m => (
-                    <div key={m}>
-                      <div style={{ fontSize: 12, color: "#b0819a", fontWeight: 600, padding: "8px 0 4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{nomeMes(m)}</div>
-                      {parcelasFuturas.filter(pf => pf.mes === m).map((pf, i) => (
-                        <div key={i} className="fin-row">
-                          <div><div style={{ fontWeight: 600, fontSize: 14, color: "#880e4f" }}>{pf.cliente}</div><div style={{ fontSize: 11, color: "#b0819a" }}>{pf.produto}</div></div>
-                          <div style={{ fontSize: 12, color: "#1565c0", fontWeight: 700 }}>{fmt(pf.valor)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
+
+
+
+
+
+
+
             </>
           )}
+
+
+
+
+
 
           {tab === "relatorios" && (
             <>

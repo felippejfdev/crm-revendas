@@ -14,7 +14,6 @@ const MESES = (() => {
 })();
 const TABS = [
   { id: "pedidos", label: "Pedidos", icon: "🛍️" },
-  { id: "clientes", label: "Clientes", icon: "👥" },
   { id: "financeiro", label: "Financeiro", icon: "💰" },
   { id: "estoque", label: "Estoque", icon: "🏪" },
   { id: "investimentos", label: "Invest.", icon: "📦" },
@@ -600,7 +599,9 @@ export default function App() {
                   { label: "Total vendido", val: fmt(totalVendido), cor: "#c2185b" },
                   { label: "Já recebido", val: fmt(totalRecebidoReal), cor: "#2e7d32" },
                   { label: "Ainda a receber", val: fmt(aReceber), cor: "#c62828" },
-                  { label: "Total investido", val: fmt(totalInv), cor: "#1565c0" },
+                  { label: "Total em produtos (catálogo)", val: fmt(totalCatalogo), cor: "#880e4f" },
+                  { label: "Total pago (com desconto)", val: fmt(totalInv), cor: "#1565c0" },
+                  { label: "Desconto obtido", val: fmt(totalCatalogo - totalInv), cor: "#2e7d32" },
                 ].map(r => (
                   <div key={r.label} className="fin-row">
                     <span className="fin-label">{r.label}</span>

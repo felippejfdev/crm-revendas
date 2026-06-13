@@ -311,16 +311,16 @@ export default function App() {
   // ESTOQUE INICIAL
   const estoqueInicial = estoques[mes] || 0;
   const totalEstoque = pedidosMes.filter(p => p.estoque).reduce((s, p) => {
-  if (p.parcelas <= 1) {
-    return s + (p.parcelas_pagas >= 1 ? Number(p.valor) : 0);
-  }
-  const entrada = Number(p.entrada) || 0;
-  const restante = Number(p.valor) - entrada;
-  const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
-  return s + entrada + (valParcela * p.parcelas_pagas);
-}, 0);
+    if (p.parcelas <= 1) {
+      return s + (p.parcelas_pagas >= 1 ? Number(p.valor) : 0);
+    }
+    const entrada = Number(p.entrada) || 0;
+    const restante = Number(p.valor) - entrada;
+    const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
+    return s + entrada + (valParcela * p.parcelas_pagas);
+  }, 0);
 
-// LUCRO = recebido normal - investido + lucro do estoque (100%)
+  // LUCRO = recebido normal - investido + lucro do estoque (100%)
   const recebidoNormal = totalRecebidoReal - totalEstoque;
   const lucro = recebidoNormal - totalInv + totalEstoque;
   // PARCELAS FUTURAS - apenas lembrete, não conta no lucro
@@ -432,6 +432,40 @@ export default function App() {
     setInvestimentos(is => is.filter(i => i.id !== id));
   };
 
+
+  const transferirSobra = async () => {
+  const proximoMes = MESES[MESES.indexOf(mes) + 1];
+  if (!proximoMes) return alert("Não há próximo mês disponível!");
+  const sobraCatalogo = totalCatalogo - totalVendido;
+  const sobraValorPago = totalCatalogo > 0 ? (sobraCatalogo / totalCatalogo) * totalInv : 0;
+  const descontoSobra = sobraCatalogo > 0 ? ((sobraCatalogo - sobraValorPago) / sobraCatalogo) * 100 : 0;
+  if (sobraCatalogo <= 0) return alert("Não há sobra para transferir!");
+  if (!window.confirm(`Transferir sobra de ${fmt(sobraCatalogo)} em produtos para ${nomeMes(proximoMes)}?`)) return;
+
+  // Apaga investimentos do mês atual
+  const invIds = invMes.map(i => i.id);
+  for (const id of invIds) {
+    await supabase.from("investimentos").delete().eq("id", id);
+  }
+  setInvestimentos(is => is.filter(i => !invIds.includes(i.id)));
+
+  // Cria investimento no próximo mês com a sobra
+  const { data } = await supabase.from("investimentos").insert([{
+    descricao: `Sobra de ${nomeMes(mes)}`,
+    valor: sobraValorPago,
+    valor_catalogo: sobraCatalogo,
+    desconto: descontoSobra,
+    valor_pago: sobraValorPago,
+    lucro_bruto: sobraCatalogo - sobraValorPago,
+    data: hoje(),
+    mes: proximoMes,
+    user_id: session.user.id
+  }]).select();
+  if (data) {
+    setInvestimentos(is => [...is, data[0]]);
+    alert(`Sobra de ${fmt(sobraCatalogo)} em produtos transferida para ${nomeMes(proximoMes)}!`);
+  }
+};
 
   const salvarPedido = async () => {
     if (!form.cliente || !form.produto || !form.valor) return;
@@ -626,7 +660,17 @@ export default function App() {
                     <span className="fin-label">{r.label}</span>
                     <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
                   </div>
+
+
+
+
+
                 ))}
+
+
+
+
+                
               </div>
 
 
@@ -634,11 +678,32 @@ export default function App() {
 
 
 
-
-
+            {totalCatalogo > 0 && totalVendido < totalCatalogo && (
+  <div className="fin-section">
+    <div className="fin-title">📦 Sobra de Investimento</div>
+    {[
+      { label: "Total em produtos (catálogo)", val: fmt(totalCatalogo), cor: "#1565c0" },
+      { label: "Total vendido", val: fmt(totalVendido), cor: "#2e7d32" },
+      { label: "Sobra em produtos", val: fmt(totalCatalogo - totalVendido), cor: "#c62828" },
+    ].map(r => (
+                    <div key={r.label} className="fin-row">
+                      <span className="fin-label">{r.label}</span>
+                      <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
+                    </div>
+                  ))}
+                  <button className="btn-novo" style={{ width: "100%", marginTop: 12 }} onClick={transferirSobra}>
+                    ➡️ Transferir sobra para o próximo mês
+                  </button>
+                </div>
+              )}
 
             </>
           )}
+
+
+
+
+         
 
 
 

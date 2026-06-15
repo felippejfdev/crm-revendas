@@ -583,23 +583,23 @@ export default function App() {
                       <div><div className="pedido-valor">{fmt(p.valor)}</div><div className="pedido-data">{p.data}</div></div>
                     </div>
                     <div className="parcelas-row">
-                      {Array.from({ length: p.parcelas }).map((_, i) => (
-                        <div key={i} className={`parcela-dot ${i < p.parcelas_pagas ? "pago" : "aberto"}`} />
-                      ))}
-                      <span className="parcelas-info">
+  {Number(p.entrada) > 0 && Array.from({ length: p.parcelas }).map((_, i) => (
+    <div key={i} className={`parcela-dot ${i < p.parcelas_pagas ? "pago" : "aberto"}`} />
+  ))}
+  <span className="parcelas-info">
                         {entrada > 0
                           ? `✓ Entrada ${fmt(entrada)} paga · ${p.parcelas} parcelas de ${fmt(valParcela)}`
-                          : p.parcelas <= 1
-                            ? `À vista · ${fmt(p.valor)}`
-                            : `${p.parcelas_pagas}/${p.parcelas} parcelas · ${fmt(valParcela)} cada`
+                         : p.parcelas <= 1
+  ? `À vista · ${fmt(p.valor)}`
+  : `Parcelado em ${p.parcelas}x de ${fmt(valParcela)}`
                         }
                       </span>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <span className={`status-badge ${p.entregue ? "status-entregue" : "status-pendente"}`}>{p.entregue ? "✓ Entregue" : "⏳ Pendente"}</span>
-                      {p.parcelas > 1 && (
-                        <span className={`status-badge ${Débito === 0 ? "status-quitado" : "status-Débito"}`}>{Débito === 0 ? "✓ Quitado" : `Débito ${fmt(Débito)}`}</span>
-                      )}
+                     {p.parcelas > 1 && Number(p.entrada) > 0 && (
+  <span className={`status-badge ${Débito === 0 ? "status-quitado" : "status-Débito"}`}>{Débito === 0 ? "✓ Quitado" : `Débito ${fmt(Débito)}`}</span>
+)}
                     </div>
                     <div className="btns-row">
                       {!p.entregue && <button className="btn-entregar" onClick={() => marcarEntregue(p.id)}>📦 Entreguei</button>}

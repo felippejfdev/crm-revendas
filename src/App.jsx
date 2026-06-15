@@ -330,10 +330,10 @@ export default function App() {
     const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
     const parcelasPendentes = p.parcelas - p.parcelas_pagas;
     if (parcelasPendentes <= 0) return [];
-  const dataBase = new Date(p.data_primeiro_pagamento || p.data);
-return Array.from({ length: parcelasPendentes }, (_, i) => {
-  const dataVenc = new Date(dataBase);
-  dataVenc.setMonth(dataVenc.getMonth() + p.parcelas_pagas + i);
+    const dataBase = new Date(p.data_primeiro_pagamento || p.data);
+    return Array.from({ length: parcelasPendentes }, (_, i) => {
+      const dataVenc = new Date(dataBase);
+      dataVenc.setMonth(dataVenc.getMonth() + p.parcelas_pagas + i);
       const mesVenc = `${dataVenc.getFullYear()}-${String(dataVenc.getMonth() + 1).padStart(2, "0")}`;
       return { cliente: p.cliente, produto: p.produto, valor: valParcela, mes: mesVenc, mesPedido: p.mes, pedidoId: p.id, parcelaAtual: p.parcelas_pagas, totalParcelas: p.parcelas };
     });
@@ -434,38 +434,38 @@ return Array.from({ length: parcelasPendentes }, (_, i) => {
 
 
   const transferirSobra = async () => {
-  const proximoMes = MESES[MESES.indexOf(mes) + 1];
-  if (!proximoMes) return alert("Não há próximo mês disponível!");
-  const sobraCatalogo = totalCatalogo - totalVendido;
-  const sobraValorPago = totalCatalogo > 0 ? (sobraCatalogo / totalCatalogo) * totalInv : 0;
-  const descontoSobra = sobraCatalogo > 0 ? ((sobraCatalogo - sobraValorPago) / sobraCatalogo) * 100 : 0;
-  if (sobraCatalogo <= 0) return alert("Não há sobra para transferir!");
-  if (!window.confirm(`Transferir sobra de ${fmt(sobraCatalogo)} em produtos para ${nomeMes(proximoMes)}?`)) return;
+    const proximoMes = MESES[MESES.indexOf(mes) + 1];
+    if (!proximoMes) return alert("Não há próximo mês disponível!");
+    const sobraCatalogo = totalCatalogo - totalVendido;
+    const sobraValorPago = totalCatalogo > 0 ? (sobraCatalogo / totalCatalogo) * totalInv : 0;
+    const descontoSobra = sobraCatalogo > 0 ? ((sobraCatalogo - sobraValorPago) / sobraCatalogo) * 100 : 0;
+    if (sobraCatalogo <= 0) return alert("Não há sobra para transferir!");
+    if (!window.confirm(`Transferir sobra de ${fmt(sobraCatalogo)} em produtos para ${nomeMes(proximoMes)}?`)) return;
 
-  // Apaga investimentos do mês atual
-  const invIds = invMes.map(i => i.id);
-  for (const id of invIds) {
-    await supabase.from("investimentos").delete().eq("id", id);
-  }
-  setInvestimentos(is => is.filter(i => !invIds.includes(i.id)));
+    // Apaga investimentos do mês atual
+    const invIds = invMes.map(i => i.id);
+    for (const id of invIds) {
+      await supabase.from("investimentos").delete().eq("id", id);
+    }
+    setInvestimentos(is => is.filter(i => !invIds.includes(i.id)));
 
-  // Cria investimento no próximo mês com a sobra
-  const { data } = await supabase.from("investimentos").insert([{
-    descricao: `Sobra de ${nomeMes(mes)}`,
-    valor: sobraValorPago,
-    valor_catalogo: sobraCatalogo,
-    desconto: descontoSobra,
-    valor_pago: sobraValorPago,
-    lucro_bruto: sobraCatalogo - sobraValorPago,
-    data: hoje(),
-    mes: proximoMes,
-    user_id: session.user.id
-  }]).select();
-  if (data) {
-    setInvestimentos(is => [...is, data[0]]);
-    alert(`Sobra de ${fmt(sobraCatalogo)} em produtos transferida para ${nomeMes(proximoMes)}!`);
-  }
-};
+    // Cria investimento no próximo mês com a sobra
+    const { data } = await supabase.from("investimentos").insert([{
+      descricao: `Sobra de ${nomeMes(mes)}`,
+      valor: sobraValorPago,
+      valor_catalogo: sobraCatalogo,
+      desconto: descontoSobra,
+      valor_pago: sobraValorPago,
+      lucro_bruto: sobraCatalogo - sobraValorPago,
+      data: hoje(),
+      mes: proximoMes,
+      user_id: session.user.id
+    }]).select();
+    if (data) {
+      setInvestimentos(is => [...is, data[0]]);
+      alert(`Sobra de ${fmt(sobraCatalogo)} em produtos transferida para ${nomeMes(proximoMes)}!`);
+    }
+  };
 
   const salvarPedido = async () => {
     if (!form.cliente || !form.produto || !form.valor) return;
@@ -603,12 +603,10 @@ return Array.from({ length: parcelasPendentes }, (_, i) => {
                     </div>
                     <div className="btns-row">
                       {!p.entregue && <button className="btn-entregar" onClick={() => marcarEntregue(p.id)}>📦 Entreguei</button>}
-                      {p.parcelas <= 1
-                        ? <button className={`btn-pagar`} onClick={() => pagarParcela(p.id, p.parcelas_pagas, 1)} style={{ opacity: p.parcelas_pagas >= 1 ? 0.5 : 1 }}>
+                      {p.parcelas <= 1 &&
+                        <button className={`btn-pagar`} onClick={() => pagarParcela(p.id, p.parcelas_pagas, 1)} style={{ opacity: p.parcelas_pagas >= 1 ? 0.5 : 1 }}>
                           {p.parcelas_pagas >= 1 ? "✓ Pago" : "💰 Marcar Pago"}
                         </button>
-                        : p.parcelas_pagas < p.parcelas && Number(p.entrada) === 0 &&
-                        <button className="btn-pagar" onClick={() => pagarParcela(p.id, p.parcelas_pagas, p.parcelas)}>💰 Parcela Paga</button>
                       }
                       {p.parcelas_pagas > 0 && <button className="btn-entregar" onClick={() => voltarParcela(p.id, p.parcelas_pagas)}>↩ Voltar Parcela</button>}
                       <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={() => excluirPedido(p.id)}>🗑 Excluir</button>
@@ -670,7 +668,7 @@ return Array.from({ length: parcelasPendentes }, (_, i) => {
 
 
 
-                
+
               </div>
 
 
@@ -678,14 +676,14 @@ return Array.from({ length: parcelasPendentes }, (_, i) => {
 
 
 
-            {totalCatalogo > 0 && totalVendido < totalCatalogo && (
-  <div className="fin-section">
-    <div className="fin-title">📦 Sobra de Investimento</div>
-    {[
-      { label: "Total em produtos (catálogo)", val: fmt(totalCatalogo), cor: "#1565c0" },
-      { label: "Total vendido", val: fmt(totalVendido), cor: "#2e7d32" },
-      { label: "Sobra em produtos", val: fmt(totalCatalogo - totalVendido), cor: "#c62828" },
-    ].map(r => (
+              {totalCatalogo > 0 && totalVendido < totalCatalogo && (
+                <div className="fin-section">
+                  <div className="fin-title">📦 Sobra de Investimento</div>
+                  {[
+                    { label: "Total em produtos (catálogo)", val: fmt(totalCatalogo), cor: "#1565c0" },
+                    { label: "Total vendido", val: fmt(totalVendido), cor: "#2e7d32" },
+                    { label: "Sobra em produtos", val: fmt(totalCatalogo - totalVendido), cor: "#c62828" },
+                  ].map(r => (
                     <div key={r.label} className="fin-row">
                       <span className="fin-label">{r.label}</span>
                       <span className="fin-val" style={{ color: r.cor }}>{r.val}</span>
@@ -703,7 +701,7 @@ return Array.from({ length: parcelasPendentes }, (_, i) => {
 
 
 
-         
+
 
 
 
@@ -835,7 +833,7 @@ return Array.from({ length: parcelasPendentes }, (_, i) => {
           <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModalPedido(false)}>
             <div className="modal">
               <div className="modal-title">Novo Pedido ✦</div>
-             {[["Cliente", "cliente", "text", "Nome da cliente"], ["Produto", "produto", "text", "Ex: Perfume Rose"], ["Valor Total (R$)", "valor", "number", "0,00"], ["Entrada (R$)", "entrada", "number", "0,00"], ["Parcelas restantes", "parcelas", "number", "1"], ["Data do Pedido", "data", "date", ""], ["Data do 1º Pagamento", "data_primeiro_pagamento", "date", ""]].map(([label, key, type, ph]) => (
+              {[["Cliente", "cliente", "text", "Nome da cliente"], ["Produto", "produto", "text", "Ex: Perfume Rose"], ["Valor Total (R$)", "valor", "number", "0,00"], ["Entrada (R$)", "entrada", "number", "0,00"], ["Parcelas restantes", "parcelas", "number", "1"], ["Data do Pedido", "data", "date", ""], ["Data do 1º Pagamento", "data_primeiro_pagamento", "date", ""]].map(([label, key, type, ph]) => (
                 <div className="field" key={key}>
                   <label>{label}</label>
                   <input type={type} placeholder={ph} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />

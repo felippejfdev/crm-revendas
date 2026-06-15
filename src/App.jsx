@@ -204,7 +204,7 @@ export default function App() {
   const [estoqueTemp, setEstoqueTemp] = useState(0);
   const [modalPedido, setModalPedido] = useState(false);
   const [modalInv, setModalInv] = useState(false);
-  const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", entrada: "0", data: hoje(), mes: "", origem: "", estoque: false });
+  const [form, setForm] = useState({ cliente: "", produto: "", valor: "", parcelas: "1", entrada: "0", data: hoje(), data_primeiro_pagamento: hoje(), mes: "", origem: "", estoque: false });
   const [invForm, setInvForm] = useState({ descricao: "", valor_catalogo: "", desconto: "", data: hoje(), mes: "" });
 
   useEffect(() => {
@@ -330,10 +330,10 @@ export default function App() {
     const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
     const parcelasPendentes = p.parcelas - p.parcelas_pagas;
     if (parcelasPendentes <= 0) return [];
-    const dataBase = new Date(p.data);
-    return Array.from({ length: parcelasPendentes }, (_, i) => {
-      const dataVenc = new Date(dataBase);
-      dataVenc.setMonth(dataVenc.getMonth() + p.parcelas_pagas + i + 1);
+  const dataBase = new Date(p.data_primeiro_pagamento || p.data);
+return Array.from({ length: parcelasPendentes }, (_, i) => {
+  const dataVenc = new Date(dataBase);
+  dataVenc.setMonth(dataVenc.getMonth() + p.parcelas_pagas + i);
       const mesVenc = `${dataVenc.getFullYear()}-${String(dataVenc.getMonth() + 1).padStart(2, "0")}`;
       return { cliente: p.cliente, produto: p.produto, valor: valParcela, mes: mesVenc, mesPedido: p.mes, pedidoId: p.id, parcelaAtual: p.parcelas_pagas, totalParcelas: p.parcelas };
     });
@@ -835,7 +835,7 @@ export default function App() {
           <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModalPedido(false)}>
             <div className="modal">
               <div className="modal-title">Novo Pedido ✦</div>
-              {[["Cliente", "cliente", "text", "Nome da cliente"], ["Produto", "produto", "text", "Ex: Perfume Rose"], ["Valor Total (R$)", "valor", "number", "0,00"], ["Entrada (R$)", "entrada", "number", "0,00"], ["Parcelas restantes", "parcelas", "number", "1"], ["Data do Pedido", "data", "date", ""]].map(([label, key, type, ph]) => (
+             {[["Cliente", "cliente", "text", "Nome da cliente"], ["Produto", "produto", "text", "Ex: Perfume Rose"], ["Valor Total (R$)", "valor", "number", "0,00"], ["Entrada (R$)", "entrada", "number", "0,00"], ["Parcelas restantes", "parcelas", "number", "1"], ["Data do Pedido", "data", "date", ""], ["Data do 1º Pagamento", "data_primeiro_pagamento", "date", ""]].map(([label, key, type, ph]) => (
                 <div className="field" key={key}>
                   <label>{label}</label>
                   <input type={type} placeholder={ph} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />

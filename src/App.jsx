@@ -324,7 +324,7 @@ export default function App() {
   const recebidoNormal = totalRecebidoReal - totalEstoque;
   const lucro = recebidoNormal - totalInv + totalEstoque;
   // PARCELAS FUTURAS - apenas lembrete, não conta no lucro
-  const parcelasFuturas = pedidos.filter(p => p.mes && p.cliente && p.parcelas > 0).flatMap(p => {
+ const parcelasFuturas = pedidos.filter(p => p.mes && p.cliente && p.parcelas > 1).flatMap(p => {
     const entrada = Number(p.entrada) || 0;
     const restante = Number(p.valor) - entrada;
     const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;

@@ -433,54 +433,64 @@ export default function App() {
 
 
   const transferirSobra = async () => {
-    const proximoMes = MESES[MESES.indexOf(mes) + 1];
-    if (!proximoMes) return alert("Não há próximo mês disponível!");
-    const sobraCatalogo = totalCatalogo - totalVendido;
-    if (sobraCatalogo <= 0) return alert("Não há sobra para transferir!");
-    if (!window.confirm(`Transferir sobra de ${fmt(sobraCatalogo)} em produtos para o estoque de ${nomeMes(proximoMes)}?`)) return;
+  const proximoMes = MESES[MESES.indexOf(mes) + 1];
+  if (!proximoMes) return alert("Não há próximo mês disponível!");
+  const vendidoReal = totalVendido - totalEstoque;
+  const sobraCatalogo = totalCatalogo - vendidoReal;
+  const sobraValorPago = totalCatalogo > 0 ? (sobraCatalogo / totalCatalogo) * totalInv : 0;
+  const descontoSobra = sobraCatalogo > 0 ? ((sobraCatalogo - sobraValorPago) / sobraCatalogo) * 100 : 0;
+  if (sobraCatalogo <= 0) return alert("Não há sobra para transferir!");
+  if (!window.confirm(`Transferir sobra de ${fmt(sobraCatalogo)} em produtos para ${nomeMes(proximoMes)}?`)) return;
 
-    // Calcula proporção do que foi vendido vs total catálogo
-    const propVendido = totalCatalogo > 0 ? totalVendido / totalCatalogo : 0;
-    const custoVendido = totalInv * propVendido;
+  // Apaga investimentos do mês atual
+  const invIds = invMes.map(i => i.id);
+  for (const id of invIds) {
+    await supabase.from("investimentos").delete().eq("id", id);
+  }
+  setInvestimentos(is => is.filter(i => !invIds.includes(i.id)));
 
-    // Apaga investimentos do mês atual
-    const invIds = invMes.map(i => i.id);
-    for (const id of invIds) {
-      await supabase.from("investimentos").delete().eq("id", id);
-    }
-    setInvestimentos(is => is.filter(i => !invIds.includes(i.id)));
+  // Recria investimento proporcional ao que foi vendido (excluindo estoque)
+  const custoVendido = totalCatalogo > 0 ? (vendidoReal / totalCatalogo) * totalInv : 0;
+  if (custoVendido > 0) {
+    const { data: invData } = await supabase.from("investimentos").insert([{
+      descricao: `Custo proporcional de ${nomeMes(mes)}`,
+      valor: custoVendido,
+      valor_catalogo: vendidoReal,
+      desconto: descontoSobra,
+      valor_pago: custoVendido,
+      lucro_bruto: vendidoReal - custoVendido,
+      data: hoje(),
+      mes,
+      user_id: session.user.id
+    }]).select();
+    if (invData) setInvestimentos(is => [...is, invData[0]]);
+  }
 
-    // Cria investimento proporcional ao que foi vendido (custo real de junho)
-    if (custoVendido > 0) {
-      const propDesconto = totalCatalogo > 0 ? ((totalCatalogo - totalInv) / totalCatalogo) * 100 : 0;
-      const { data } = await supabase.from("investimentos").insert([{
-        descricao: `Custo proporcional de ${nomeMes(mes)}`,
-        valor: custoVendido,
-        valor_catalogo: totalVendido,
-        desconto: propDesconto,
-        valor_pago: custoVendido,
-        lucro_bruto: totalVendido - custoVendido,
-        data: hoje(),
-        mes,
-        user_id: session.user.id
-      }]).select();
-      if (data) setInvestimentos(is => [...is, data[0]]);
-    }
+  // Cria estoque no próximo mês com a sobra
+  const { error: estoqueError } = await supabase.from("estoque").upsert({
+    user_id: session.user.id,
+    mes: proximoMes,
+    estoque_inicial: sobraCatalogo
+  }, { onConflict: "user_id,mes" });
+  if (estoqueError) { alert("Erro ao salvar estoque: " + estoqueError.message); return; }
+  setEstoques(e => ({ ...e, [proximoMes]: sobraCatalogo }));
 
-    // Cria estoque no próximo mês com a sobra
-    const { error } = await supabase.from("estoque").upsert({
-      user_id: session.user.id,
-      mes: proximoMes,
-      estoque_inicial: sobraCatalogo
-    }, { onConflict: "user_id,mes" });
+  // Cria investimento no próximo mês com o custo da sobra
+  const { data: invProximo } = await supabase.from("investimentos").insert([{
+    descricao: `Custo da sobra de ${nomeMes(mes)}`,
+    valor: sobraValorPago,
+    valor_catalogo: sobraCatalogo,
+    desconto: descontoSobra,
+    valor_pago: sobraValorPago,
+    lucro_bruto: sobraCatalogo - sobraValorPago,
+    data: hoje(),
+    mes: proximoMes,
+    user_id: session.user.id
+  }]).select();
+  if (invProximo) setInvestimentos(is => [...is, invProximo[0]]);
 
-    if (!error) {
-      setEstoques(e => ({ ...e, [proximoMes]: sobraCatalogo }));
-      alert(`Sobra de ${fmt(sobraCatalogo)} transferida para o estoque de ${nomeMes(proximoMes)}!`);
-    } else {
-      alert("Erro ao transferir: " + error.message);
-    }
-  };
+  alert(`Sobra de ${fmt(sobraCatalogo)} transferida para ${nomeMes(proximoMes)}!`);
+};
   const salvarPedido = async () => {
     if (!form.cliente || !form.produto || !form.valor) return;
     const entrada = Number(form.entrada) || 0;

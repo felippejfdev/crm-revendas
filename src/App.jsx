@@ -829,7 +829,12 @@ export default function App() {
                 <div key={i.id} className="inv-card">
                   <div><div className="inv-desc">{i.descricao}</div><div className="inv-data">{i.data}</div></div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div className="inv-val">{fmt(i.valor_catalogo || i.valor)}</div>
+                  <div>
+  <div className="inv-val">{fmt(i.valor_catalogo || i.valor)}</div>
+  {i.valor_catalogo && i.valor && i.valor_catalogo !== i.valor && (
+    <div style={{ fontSize: 11, color: "#b0819a" }}>pago: {fmt(i.valor)}</div>
+  )}
+</div>
                     <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={() => excluirInv(i.id)}>🗑</button>
                   </div>
                 </div>

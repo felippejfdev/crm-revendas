@@ -200,6 +200,7 @@ export default function App() {
   const [editandoMargem, setEditandoMargem] = useState(false);
   const [margemTemp, setMargemTemp] = useState(50);
   const [estoques, setEstoques] = useState({});
+  const [estoqueOrigem, setEstoqueOrigem] = useState({});
   const [editandoEstoque, setEditandoEstoque] = useState(false);
   const [estoqueTemp, setEstoqueTemp] = useState(0);
   const [modalPedido, setModalPedido] = useState(false);
@@ -253,7 +254,6 @@ export default function App() {
       setEstoques(e);
     }
   };
-
   const salvarEstoque = async (valor) => {
     const { error } = await supabase.from("estoque").upsert({
       user_id: session.user.id,
@@ -267,7 +267,6 @@ export default function App() {
       setEditandoEstoque(false);
     }
   };
-
 
 
   const salvarMargem = async (valor) => {
@@ -324,7 +323,7 @@ export default function App() {
   const recebidoNormal = totalRecebidoReal - totalEstoque;
   const lucro = recebidoNormal - totalInv + totalEstoque;
   // PARCELAS FUTURAS - apenas lembrete, não conta no lucro
- const parcelasFuturas = pedidos.filter(p => p.mes && p.cliente && p.parcelas > 1).flatMap(p => {
+  const parcelasFuturas = pedidos.filter(p => p.mes && p.cliente && p.parcelas > 1).flatMap(p => {
     const entrada = Number(p.entrada) || 0;
     const restante = Number(p.valor) - entrada;
     const valParcela = p.parcelas > 0 ? restante / p.parcelas : 0;
@@ -437,10 +436,12 @@ export default function App() {
     const proximoMes = MESES[MESES.indexOf(mes) + 1];
     if (!proximoMes) return alert("Não há próximo mês disponível!");
     const sobraCatalogo = totalCatalogo - totalVendido;
-    const sobraValorPago = totalCatalogo > 0 ? (sobraCatalogo / totalCatalogo) * totalInv : 0;
-    const descontoSobra = sobraCatalogo > 0 ? ((sobraCatalogo - sobraValorPago) / sobraCatalogo) * 100 : 0;
     if (sobraCatalogo <= 0) return alert("Não há sobra para transferir!");
-    if (!window.confirm(`Transferir sobra de ${fmt(sobraCatalogo)} em produtos para ${nomeMes(proximoMes)}?`)) return;
+    if (!window.confirm(`Transferir sobra de ${fmt(sobraCatalogo)} em produtos para o estoque de ${nomeMes(proximoMes)}?`)) return;
+
+    // Calcula proporção do que foi vendido vs total catálogo
+    const propVendido = totalCatalogo > 0 ? totalVendido / totalCatalogo : 0;
+    const custoVendido = totalInv * propVendido;
 
     // Apaga investimentos do mês atual
     const invIds = invMes.map(i => i.id);
@@ -449,24 +450,37 @@ export default function App() {
     }
     setInvestimentos(is => is.filter(i => !invIds.includes(i.id)));
 
-    // Cria investimento no próximo mês com a sobra
-    const { data } = await supabase.from("investimentos").insert([{
-      descricao: `Sobra de ${nomeMes(mes)}`,
-      valor: sobraValorPago,
-      valor_catalogo: sobraCatalogo,
-      desconto: descontoSobra,
-      valor_pago: sobraValorPago,
-      lucro_bruto: sobraCatalogo - sobraValorPago,
-      data: hoje(),
+    // Cria investimento proporcional ao que foi vendido (custo real de junho)
+    if (custoVendido > 0) {
+      const propDesconto = totalCatalogo > 0 ? ((totalCatalogo - totalInv) / totalCatalogo) * 100 : 0;
+      const { data } = await supabase.from("investimentos").insert([{
+        descricao: `Custo proporcional de ${nomeMes(mes)}`,
+        valor: custoVendido,
+        valor_catalogo: totalVendido,
+        desconto: propDesconto,
+        valor_pago: custoVendido,
+        lucro_bruto: totalVendido - custoVendido,
+        data: hoje(),
+        mes,
+        user_id: session.user.id
+      }]).select();
+      if (data) setInvestimentos(is => [...is, data[0]]);
+    }
+
+    // Cria estoque no próximo mês com a sobra
+    const { error } = await supabase.from("estoque").upsert({
+      user_id: session.user.id,
       mes: proximoMes,
-      user_id: session.user.id
-    }]).select();
-    if (data) {
-      setInvestimentos(is => [...is, data[0]]);
-      alert(`Sobra de ${fmt(sobraCatalogo)} em produtos transferida para ${nomeMes(proximoMes)}!`);
+      estoque_inicial: sobraCatalogo
+    }, { onConflict: "user_id,mes" });
+
+    if (!error) {
+      setEstoques(e => ({ ...e, [proximoMes]: sobraCatalogo }));
+      alert(`Sobra de ${fmt(sobraCatalogo)} transferida para o estoque de ${nomeMes(proximoMes)}!`);
+    } else {
+      alert("Erro ao transferir: " + error.message);
     }
   };
-
   const salvarPedido = async () => {
     if (!form.cliente || !form.produto || !form.valor) return;
     const entrada = Number(form.entrada) || 0;
@@ -583,23 +597,23 @@ export default function App() {
                       <div><div className="pedido-valor">{fmt(p.valor)}</div><div className="pedido-data">{p.data}</div></div>
                     </div>
                     <div className="parcelas-row">
-  {Number(p.entrada) > 0 && Array.from({ length: p.parcelas }).map((_, i) => (
-    <div key={i} className={`parcela-dot ${i < p.parcelas_pagas ? "pago" : "aberto"}`} />
-  ))}
-  <span className="parcelas-info">
+                      {Number(p.entrada) > 0 && Array.from({ length: p.parcelas }).map((_, i) => (
+                        <div key={i} className={`parcela-dot ${i < p.parcelas_pagas ? "pago" : "aberto"}`} />
+                      ))}
+                      <span className="parcelas-info">
                         {entrada > 0
                           ? `✓ Entrada ${fmt(entrada)} paga · ${p.parcelas} parcelas de ${fmt(valParcela)}`
-                         : p.parcelas <= 1
-  ? `À vista · ${fmt(p.valor)}`
-  : `Parcelado em ${p.parcelas}x de ${fmt(valParcela)}`
+                          : p.parcelas <= 1
+                            ? `À vista · ${fmt(p.valor)}`
+                            : `Parcelado em ${p.parcelas}x de ${fmt(valParcela)}`
                         }
                       </span>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <span className={`status-badge ${p.entregue ? "status-entregue" : "status-pendente"}`}>{p.entregue ? "✓ Entregue" : "⏳ Pendente"}</span>
-                     {p.parcelas > 1 && Number(p.entrada) > 0 && (
-  <span className={`status-badge ${Débito === 0 ? "status-quitado" : "status-Débito"}`}>{Débito === 0 ? "✓ Quitado" : `Débito ${fmt(Débito)}`}</span>
-)}
+                      {p.parcelas > 1 && Number(p.entrada) > 0 && (
+                        <span className={`status-badge ${Débito === 0 ? "status-quitado" : "status-Débito"}`}>{Débito === 0 ? "✓ Quitado" : `Débito ${fmt(Débito)}`}</span>
+                      )}
                     </div>
                     <div className="btns-row">
                       {!p.entregue && <button className="btn-entregar" onClick={() => marcarEntregue(p.id)}>📦 Entreguei</button>}
@@ -762,6 +776,7 @@ export default function App() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                   <span style={{ fontSize: 13, color: "#6d4c61" }}>
                     Valor em estoque: <strong style={{ color: "#c2185b" }}>{fmt(estoques[mes] || 0)}</strong>
+                   
                   </span>
                   <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setEstoqueTemp(estoques[mes] || 0); setEditandoEstoque(true); }}>
                     ✏️ Editar
@@ -814,7 +829,7 @@ export default function App() {
                 <div key={i.id} className="inv-card">
                   <div><div className="inv-desc">{i.descricao}</div><div className="inv-data">{i.data}</div></div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div className="inv-val">{fmt(i.valor)}</div>
+                    <div className="inv-val">{fmt(i.valor_catalogo || i.valor)}</div>
                     <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={() => excluirInv(i.id)}>🗑</button>
                   </div>
                 </div>

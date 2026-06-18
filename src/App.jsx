@@ -593,7 +593,10 @@ export default function App() {
                 return (
                   <div key={p.id} className="pedido-card">
                     <div className="pedido-top">
-                      <div className="pedido-produto">{p.produto}{p.origem ? ` · ${p.origem}` : ""}</div>
+                     <div>
+  <div className="pedido-nome">{p.cliente}</div>
+  <div className="pedido-produto">{p.produto}{p.origem ? ` · ${p.origem}` : ""}</div>
+</div>
                       <div><div className="pedido-valor">{fmt(p.valor)}</div><div className="pedido-data">{p.data}</div></div>
                     </div>
                     <div className="parcelas-row">

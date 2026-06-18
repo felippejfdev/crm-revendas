@@ -593,10 +593,10 @@ export default function App() {
                 return (
                   <div key={p.id} className="pedido-card">
                     <div className="pedido-top">
-                     <div>
-  <div className="pedido-nome">{p.cliente}</div>
-  <div className="pedido-produto">{p.produto}{p.origem ? ` · ${p.origem}` : ""}</div>
-</div>
+                      <div>
+                        <div className="pedido-nome">{p.cliente}</div>
+                        <div className="pedido-produto">{p.produto}{p.origem ? ` · ${p.origem}` : ""}</div>
+                      </div>
                       <div><div className="pedido-valor">{fmt(p.valor)}</div><div className="pedido-data">{p.data}</div></div>
                     </div>
                     <div className="parcelas-row">
@@ -693,13 +693,13 @@ export default function App() {
 
 
 
-              {totalCatalogo > 0 && totalVendido < totalCatalogo && (
+            {totalCatalogo > 0 && (totalVendido - totalEstoque) < totalCatalogo && (
                 <div className="fin-section">
                   <div className="fin-title">📦 Sobra de Investimento</div>
                   {[
                     { label: "Total em produtos (catálogo)", val: fmt(totalCatalogo), cor: "#1565c0" },
-                    { label: "Total vendido", val: fmt(totalVendido), cor: "#2e7d32" },
-                    { label: "Sobra em produtos", val: fmt(totalCatalogo - totalVendido), cor: "#c62828" },
+                    { label: "Total vendido (produtos novos)", val: fmt(totalVendido - totalEstoque), cor: "#2e7d32" },
+                    { label: "Sobra em produtos", val: fmt(totalCatalogo - (totalVendido - totalEstoque)), cor: "#c62828" },
                   ].map(r => (
                     <div key={r.label} className="fin-row">
                       <span className="fin-label">{r.label}</span>
@@ -779,7 +779,7 @@ export default function App() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                   <span style={{ fontSize: 13, color: "#6d4c61" }}>
                     Valor em estoque: <strong style={{ color: "#c2185b" }}>{fmt(estoques[mes] || 0)}</strong>
-                   
+
                   </span>
                   <button className="btn-novo" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => { setEstoqueTemp(estoques[mes] || 0); setEditandoEstoque(true); }}>
                     ✏️ Editar
@@ -832,12 +832,12 @@ export default function App() {
                 <div key={i.id} className="inv-card">
                   <div><div className="inv-desc">{i.descricao}</div><div className="inv-data">{i.data}</div></div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div>
-  <div className="inv-val">{fmt(i.valor_catalogo || i.valor)}</div>
-  {i.valor_catalogo && i.valor && i.valor_catalogo !== i.valor && (
-    <div style={{ fontSize: 11, color: "#b0819a" }}>pago: {fmt(i.valor)}</div>
-  )}
-</div>
+                    <div>
+                      <div className="inv-val">{fmt(i.valor_catalogo || i.valor)}</div>
+                      {i.valor_catalogo && i.valor && i.valor_catalogo !== i.valor && (
+                        <div style={{ fontSize: 11, color: "#b0819a" }}>pago: {fmt(i.valor)}</div>
+                      )}
+                    </div>
                     <button style={{ background: "#fce4ec", color: "#c62828", border: "1.5px solid #ef9a9a", borderRadius: 10, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "DM Sans, sans-serif" }} onClick={() => excluirInv(i.id)}>🗑</button>
                   </div>
                 </div>

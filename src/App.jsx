@@ -303,9 +303,9 @@ export default function App() {
   }, 0);
   const aReceber = totalVendido - totalRecebidoReal;
 
-  // INVESTIMENTOS
-  const totalCatalogo = invMes.reduce((s, i) => s + Number(i.valor_catalogo || 0), 0);
-  const totalInv = invMes.reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
+const totalCatalogo = invMes.filter(i => !i.descricao?.startsWith("Custo da sobra")).reduce((s, i) => s + Number(i.valor_catalogo || 0), 0);
+const totalInv = invMes.filter(i => !i.descricao?.startsWith("Custo da sobra")).reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
+const totalSobra = invMes.filter(i => i.descricao?.startsWith("Custo da sobra")).reduce((s, i) => s + Number(i.valor_pago || i.valor || 0), 0);
 
   // ESTOQUE INICIAL
   const estoqueInicial = estoques[mes] || 0;
@@ -321,7 +321,7 @@ export default function App() {
 
   // LUCRO = recebido normal - investido + lucro do estoque (100%)
   const recebidoNormal = totalRecebidoReal - totalEstoque;
-  const lucro = recebidoNormal - totalInv + totalEstoque;
+ const lucro = recebidoNormal - totalInv - totalSobra + totalEstoque;
   // PARCELAS FUTURAS - apenas lembrete, não conta no lucro
   const parcelasFuturas = pedidos.filter(p => p.mes && p.cliente && p.parcelas > 1).flatMap(p => {
     const entrada = Number(p.entrada) || 0;
